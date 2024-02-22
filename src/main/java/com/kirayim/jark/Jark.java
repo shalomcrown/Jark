@@ -9,11 +9,13 @@ import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 /**
  * Hello world!
@@ -36,11 +38,17 @@ public class Jark implements Closeable, HttpHandler {
 
     List<JarkRoute> routes = new ArrayList<>();
 
+    List<JarkRoute> beforeFilters = new ArrayList<>();
+
+    List<JarkRoute> afterFilters = new ArrayList<>();
 
     // ===========================================================================
 
     public static Jark ignite() {
         return new Jark();
+    }
+
+    public Jark() {
     }
 
     // ===========================================================================
@@ -53,8 +61,19 @@ public class Jark implements Closeable, HttpHandler {
             server = HttpServer.create(new InetSocketAddress(ipAddress, port), -1);
         }
 
+        if (basePath.endsWith("/") == false) {
+            basePath = basePath + "/";
+        }
+
         server.setExecutor(executor);
         server.createContext(basePath, this);
+        server.start();
+    }
+
+    // ===========================================================================
+
+    public void init() throws Exception {
+        start();
     }
 
     // ===========================================================================
@@ -69,18 +88,32 @@ public class Jark implements Closeable, HttpHandler {
 
     // ===========================================================================
 
+    String checkPath(String path) {
+        if (path == null) {
+            return null;
+        }
+
+        if (path.startsWith("/")) {
+            return path.substring(1);
+        }
+
+        return path;
+    }
+
+    // ===========================================================================
+
     public Jark get(String path, String accept, Route handler) {
-        routes.add(new JarkRoute(HttpMethod.GET, path, accept, handler));
+        routes.add(new JarkRoute(HttpMethod.GET, checkPath(path), accept, handler));
         return this;
     }
 
     public Jark post(String path, String accept, Route handler) {
-        routes.add(new JarkRoute(HttpMethod.POST, path, accept, handler));
+        routes.add(new JarkRoute(HttpMethod.POST, checkPath(path), accept, handler));
         return this;
     }
 
     public Jark put(String path, String accept, Route handler) {
-        routes.add(new JarkRoute(HttpMethod.PUT, path, accept, handler));
+        routes.add(new JarkRoute(HttpMethod.PUT, checkPath(path), accept, handler));
         return this;
     }
 
@@ -96,27 +129,130 @@ public class Jark implements Closeable, HttpHandler {
         return put(path, null, handler);
     }
 
+    public Jark before(HttpMethod method, String path, String accept, Filter handler) {
+        beforeFilters.add(new JarkRoute(method, checkPath(path), accept, handler));
+        return this;
+    }
+
+    public Jark before(HttpMethod method, String path, Filter handler) {
+        return before(method, path, null, handler);
+    }
+
+    public Jark before(String path, Filter handler) {
+        return before(null, path, null, handler);
+    }
+
+    public Jark before(Filter handler) {
+        return before(null, null, null, handler);
+    }
+
+    public Jark after(HttpMethod method, String path, String accept, Filter handler) {
+        afterFilters.add(new JarkRoute(method, checkPath(path), accept, handler));
+        return this;
+    }
+
+    public Jark after(HttpMethod method, String path, Filter handler) {
+        return after(method, path, null, handler);
+    }
+
+    public Jark after(String path, Filter handler) {
+        return after(null, path, null, handler);
+    }
+
+    public Jark after(Filter handler) {
+        return after(null, null, null, handler);
+    }
+
+    // ===========================================================================
+
+    List<JarkRoute> filterRoutes(Request request, List<JarkRoute> routes) {
+
+        var stream = routes.stream()
+                .filter(p -> p.path() == null || p.path().startsWith(request.path))
+                .filter(p -> p.httpMethod() == null || p.httpMethod() == request.method);
+
+        if (request.acceptTypes != null && request.acceptTypes.isEmpty() == false) {
+            stream.filter(p -> request.acceptTypes.stream().anyMatch(q -> p.acceptType().equals(q)));
+        }
+
+        return stream.collect(Collectors.toList());
+    }
+
+    // ===========================================================================
+
+    void handleException(HttpExchange exchange, Exception e) throws IOException{
+        if (exchange.getResponseCode() == -1) {
+            String message = "Internal error: " + e.getMessage();
+
+            exchange.getResponseBody().write(message.getBytes());
+            exchange.sendResponseHeaders(500, message.getBytes().length);
+        }
+
+        exchange.close();
+    }
+
+    // ===========================================================================
+
+    boolean executeFilters(Request request, Response response, List<JarkRoute> filters) throws IOException {
+        for (var route: filterRoutes(request, filters))  {
+            try {
+                switch (route.target()) {
+                    case null -> { }
+                    case Filter f -> f.handle(request, response);
+                    default -> throw new Exception("No target for filter");
+                }
+            } catch (Exception e) {
+                handleException(request.exchange, e);
+                return false;
+            }
+        };
+
+        return true;
+    }
+
     // ==============================================================================
 
     public void handle(HttpExchange exchange) throws IOException {
-//        exchange.getRequestMethod()
 
-//        exchange.getResponseHeaders().set(HttpHeaders.CONTENT_TYPE, CONTENT_TYPE);
+        Request request = new Request(exchange, basePath);
+        Response response = new Response(exchange);
 
-        try {
-//            List<ByteBuffer> requestBufs = AiHttpClient.readBuffers(exchange.getRequestBody());
-//
-//            List<ByteBuffer> responseBufs = responder.respond(requestBufs);
-//            ByteArrayOutputStream out = new ByteArrayOutputStream();
-//
-//            AiHttpClient.writeBuffers(responseBufs, out);
-//
-//            exchange.sendResponseHeaders(200, out.size());
-//            exchange.getResponseBody().write(out.toByteArray());
+        if (executeFilters(request, response, beforeFilters) == false) {
+            return;
+        }
 
-        } catch (Exception e) {
-            exchange.sendResponseHeaders(400, 0);
-            logger.error("Jark error", e);
+        List<Object> results = new ArrayList<>();
+
+        for (var route: filterRoutes(request, routes))  {
+            try {
+                switch (route.target()) {
+                    case null -> { }
+                    case Filter f -> f.handle(request, response);
+                    case Route f -> results.add(f.handle(request, response));
+                    default -> throw new Exception("No target for route");
+                }
+            } catch (Exception e) {
+                handleException(request.exchange, e);
+                return;
+            }
+        };
+
+        if (executeFilters(request, response, afterFilters) == false) {
+            return;
+        }
+
+        if (exchange.getResponseCode() == -1) {
+            int byteCount = 0;
+
+            String string = results.stream()
+                    .map(p -> p.toString())
+                    .reduce("", (p, q) -> p + q);
+
+            byte[] bytes =  string.getBytes();
+            byteCount += bytes.length;
+
+            exchange.sendResponseHeaders(response.getStatus(), byteCount);
+            exchange.getResponseBody().write(bytes);
         }
 
         exchange.close();

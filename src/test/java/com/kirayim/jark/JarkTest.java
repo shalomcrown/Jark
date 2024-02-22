@@ -1,38 +1,32 @@
 package com.kirayim.jark;
+import org.junit.Test;
+import static org.junit.Assert.*;
 
-import junit.framework.Test;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 
 /**
  * Unit test for simple App.
  */
-public class JarkTest
-    extends TestCase
-{
-    /**
-     * Create the test case
-     *
-     * @param testName name of the test case
-     */
-    public JarkTest(String testName )
-    {
-        super( testName );
-    }
+public class JarkTest {
 
-    /**
-     * @return the suite of tests being tested
-     */
-    public static Test suite()
-    {
-        return new TestSuite( JarkTest.class );
-    }
+    @Test
+    public void testApp() throws Exception{
 
-    /**
-     * Rigourous Test :-)
-     */
-    public void testApp()
-    {
-        assertTrue( true );
+        Jark jark = Jark.ignite();
+        jark.get("/test", (p, q) -> "test");
+        jark.start();
+
+        var request = HttpRequest.newBuilder()
+                .GET()
+                .uri(URI.create("http://localhost:4567/test"))
+                .build();
+
+        var client = HttpClient.newHttpClient();
+        var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+        assertEquals("test", response.body());
     }
 }
