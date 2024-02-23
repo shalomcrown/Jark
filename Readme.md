@@ -1,5 +1,5 @@
 # Jark
-![Build](**https://github.com/github/docs/actions/workflows/maven.yml/badge.svg)
+![Build](https://github.com/shalomcrown/Jark/actions/workflows/maven.yml/badge.svg)
 
 Required minimum Java version: 21
 
