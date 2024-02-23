@@ -13,6 +13,13 @@ public class Request {
     String path;
 
     List<String> acceptTypes;
+
+    String stringBody;
+
+    byte[] rawBody;
+
+    boolean gotBody = false;
+
     public Request(HttpExchange exchange, String basePath) {
         this.exchange = exchange;
         this.method = HttpMethod.get(exchange.getRequestMethod());
@@ -23,6 +30,21 @@ public class Request {
         if (path != null && path.startsWith(basePath)) {
             path = path.substring(basePath.length());
         }
+    }
+
+    // ===========================================================================
+
+    public synchronized String body() throws Exception {
+
+        if (gotBody == false) {
+            var in = exchange.getRequestBody();
+            rawBody = in.readAllBytes();
+            stringBody =  new String(rawBody);
+            in.close();
+            gotBody = true;
+        }
+
+        return stringBody;
     }
 
     // ===========================================================================

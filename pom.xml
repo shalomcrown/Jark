@@ -10,11 +10,57 @@
   <name>Jark</name>
   <url>https://github.com/shalomcrown/Jark</url>
 
+  <licenses>
+    <license>
+      <name>MIT License</name>
+      <url>https://github.com/shalomcrown/Jark/blob/main/LICENSE</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <scm>
+    <url>https://github.com/shalomcrown/Jark.git</url>
+  </scm>
+
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.target>21</maven.compiler.target>
     <maven.compiler.source>21</maven.compiler.source>
   </properties>
+
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-deploy-plugin</artifactId>
+        <configuration>
+          <skip>true</skip>
+        </configuration>
+      </plugin>
+
+
+      <plugin>
+        <groupId>org.sonatype.plugins</groupId>
+        <artifactId>nexus-staging-maven-plugin</artifactId>
+        <version>1.6.13</version>
+        <executions>
+          <execution>
+            <id>default-deploy</id>
+            <phase>deploy</phase>
+            <goals>
+              <goal>deploy</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <serverId>airo-nexus-snapshots</serverId>
+          <nexusUrl>https://nexus.az.autodrones4biz.com/repository/maven-snapshots/</nexusUrl>
+          <skipStaging>true</skipStaging>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
 
   <dependencies>
     <!-- https://mvnrepository.com/artifact/org.slf4j/slf4j-api -->
@@ -40,4 +86,12 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
+
+
+  <distributionManagement>
+    <snapshotRepository>
+      <id>airo-nexus-snapshots</id>
+      <url>https://nexus.az.autodrones4biz.com/repository/maven-snapshots/</url>
+    </snapshotRepository>
+  </distributionManagement>
 </project>

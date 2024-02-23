@@ -18,6 +18,7 @@ public class JarkTest {
         Jark jark = Jark.ignite();
         jark.get("/test", (p, q) -> "test");
         jark.get("/test/longer", (p, q) -> ":longer");
+        jark.put("/putter", (p, q) -> {System.out.println(p.body());  return "Reply: " + p.body();}); // Use body twice.
         jark.start();
 
         var request = HttpRequest.newBuilder()
@@ -46,5 +47,14 @@ public class JarkTest {
         response = client.send(request, HttpResponse.BodyHandlers.ofString());
         assertEquals("Get matching two paths should return \"test:longer\"", "test:longer", response.body());
 
+
+        var publisher = HttpRequest.BodyPublishers.ofString("request buddy");
+        request = HttpRequest.newBuilder()
+                .PUT(publisher)
+                .uri(URI.create("http://localhost:4567/putter"))
+                .build();
+
+        response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        assertEquals("Put should return \"Reply: request buddy\"", "Reply: request buddy", response.body());
     }
 }

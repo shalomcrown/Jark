@@ -89,6 +89,10 @@ public class Jark implements Closeable, HttpHandler {
         }
     }
 
+    public void stop() {
+        close();
+    }
+
     // ===========================================================================
 
     String checkPath(String path) {
@@ -307,6 +311,9 @@ public class Jark implements Closeable, HttpHandler {
         return port;
     }
 
+    public void port(int port) {
+        this.port = port;
+    }
     public void setPort(int port) {
         this.port = port;
     }
