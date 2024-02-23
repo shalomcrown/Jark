@@ -47,6 +47,10 @@ public class Request {
         return uri;
     }
 
+    public URI uri() {
+        return uri;
+    }
+
     public void setUri(URI uri) {
         this.uri = uri;
     }
@@ -57,6 +61,9 @@ public class Request {
 
     public void setPath(String path) {
         this.path = path;
+    }
+    public String path() {
+        return path;
     }
 
     public List<String> getAcceptTypes() {

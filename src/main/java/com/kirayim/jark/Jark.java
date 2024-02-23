@@ -5,12 +5,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.net.ssl.SSLContext;
-import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.URI;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executor;
@@ -42,6 +39,8 @@ public class Jark implements Closeable, HttpHandler {
 
     List<JarkRoute> afterFilters = new ArrayList<>();
 
+    HttpContext context;
+
     // ===========================================================================
 
     public static Jark ignite() {
@@ -66,7 +65,7 @@ public class Jark implements Closeable, HttpHandler {
         }
 
         server.setExecutor(executor);
-        server.createContext(basePath, this);
+        context = server.createContext(basePath, this);
         server.start();
     }
 
@@ -81,6 +80,10 @@ public class Jark implements Closeable, HttpHandler {
     public void close() {
         try {
             server.stop(1);
+
+            synchronized (this) {
+                this.notifyAll();
+            }
         } catch (Exception e) {
             logger.error("Couldn't stop Jark server", e);
         }
@@ -129,37 +132,37 @@ public class Jark implements Closeable, HttpHandler {
         return put(path, null, handler);
     }
 
-    public Jark before(HttpMethod method, String path, String accept, Filter handler) {
+    public Jark before(HttpMethod method, String path, String accept, JarkFilter handler) {
         beforeFilters.add(new JarkRoute(method, checkPath(path), accept, handler));
         return this;
     }
 
-    public Jark before(HttpMethod method, String path, Filter handler) {
+    public Jark before(HttpMethod method, String path, JarkFilter handler) {
         return before(method, path, null, handler);
     }
 
-    public Jark before(String path, Filter handler) {
+    public Jark before(String path, JarkFilter handler) {
         return before(null, path, null, handler);
     }
 
-    public Jark before(Filter handler) {
+    public Jark before(JarkFilter handler) {
         return before(null, null, null, handler);
     }
 
-    public Jark after(HttpMethod method, String path, String accept, Filter handler) {
+    public Jark after(HttpMethod method, String path, String accept, JarkFilter handler) {
         afterFilters.add(new JarkRoute(method, checkPath(path), accept, handler));
         return this;
     }
 
-    public Jark after(HttpMethod method, String path, Filter handler) {
+    public Jark after(HttpMethod method, String path, JarkFilter handler) {
         return after(method, path, null, handler);
     }
 
-    public Jark after(String path, Filter handler) {
+    public Jark after(String path, JarkFilter handler) {
         return after(null, path, null, handler);
     }
 
-    public Jark after(Filter handler) {
+    public Jark after(JarkFilter handler) {
         return after(null, null, null, handler);
     }
 
@@ -168,7 +171,7 @@ public class Jark implements Closeable, HttpHandler {
     List<JarkRoute> filterRoutes(Request request, List<JarkRoute> routes) {
 
         var stream = routes.stream()
-                .filter(p -> p.path() == null || p.path().startsWith(request.path))
+                .filter(p -> p.path() == null || request.path().startsWith(p.path()))
                 .filter(p -> p.httpMethod() == null || p.httpMethod() == request.method);
 
         if (request.acceptTypes != null && request.acceptTypes.isEmpty() == false) {
@@ -182,10 +185,19 @@ public class Jark implements Closeable, HttpHandler {
 
     void handleException(HttpExchange exchange, Exception e) throws IOException{
         if (exchange.getResponseCode() == -1) {
-            String message = "Internal error: " + e.getMessage();
+            String message;
+            int code = 500;
 
+            if (e instanceof  HTTPStatusException statusException) {
+                code = statusException.statusCode;
+                message = statusException.getMessage();
+
+            } else {
+                message = "Internal error: " + e.getMessage();
+            }
+
+            exchange.sendResponseHeaders(code, message.getBytes().length);
             exchange.getResponseBody().write(message.getBytes());
-            exchange.sendResponseHeaders(500, message.getBytes().length);
         }
 
         exchange.close();
@@ -198,14 +210,14 @@ public class Jark implements Closeable, HttpHandler {
             try {
                 switch (route.target()) {
                     case null -> { }
-                    case Filter f -> f.handle(request, response);
+                    case JarkFilter f -> f.handle(request, response);
                     default -> throw new Exception("No target for filter");
                 }
             } catch (Exception e) {
                 handleException(request.exchange, e);
                 return false;
             }
-        };
+        }
 
         return true;
     }
@@ -223,11 +235,22 @@ public class Jark implements Closeable, HttpHandler {
 
         List<Object> results = new ArrayList<>();
 
-        for (var route: filterRoutes(request, routes))  {
+        List<JarkRoute> filteredRoutes = filterRoutes(request, routes);
+
+        if (filteredRoutes == null | filteredRoutes.isEmpty()) {
+            String message = "Path not found";
+
+            exchange.sendResponseHeaders(404, message.getBytes().length);
+            exchange.getResponseBody().write(message.getBytes());
+            exchange.close();
+            return;
+        }
+
+        for (var route: filteredRoutes)  {
             try {
                 switch (route.target()) {
                     case null -> { }
-                    case Filter f -> f.handle(request, response);
+                    case JarkFilter f -> f.handle(request, response);
                     case Route f -> results.add(f.handle(request, response));
                     default -> throw new Exception("No target for route");
                 }
@@ -260,6 +283,15 @@ public class Jark implements Closeable, HttpHandler {
 
     // ===========================================================================
 
+    /**
+     * Suspend thread until server is stopped
+     * @throws InterruptedException
+     */
+    public void join() throws InterruptedException {
+        synchronized (this) {
+            this.wait();
+        }
+    }
 
     // ===========================================================================
 

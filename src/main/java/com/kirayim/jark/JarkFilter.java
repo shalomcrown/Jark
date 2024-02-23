@@ -1,7 +1,7 @@
 package com.kirayim.jark;
 
 @FunctionalInterface
-public interface Filter {
+public interface JarkFilter {
     /**
      * Invoked when a request is made on this route's corresponding path e.g. '/hello'
      *

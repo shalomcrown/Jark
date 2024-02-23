@@ -17,6 +17,7 @@ public class JarkTest {
 
         Jark jark = Jark.ignite();
         jark.get("/test", (p, q) -> "test");
+        jark.get("/test/longer", (p, q) -> ":longer");
         jark.start();
 
         var request = HttpRequest.newBuilder()
@@ -27,6 +28,23 @@ public class JarkTest {
         var client = HttpClient.newHttpClient();
         var response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
-        assertEquals("test", response.body());
+        assertEquals("Simple Get should return \"test\"", "test", response.body());
+
+        request = HttpRequest.newBuilder()
+                .GET()
+                .uri(URI.create("http://localhost:4567/frod"))
+                .build();
+
+        response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        assertEquals("Request to bad path should return not found", 404, response.statusCode());
+
+        request = HttpRequest.newBuilder()
+                .GET()
+                .uri(URI.create("http://localhost:4567/test/longer"))
+                .build();
+
+        response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        assertEquals("Get matching two paths should return \"test:longer\"", "test:longer", response.body());
+
     }
 }
