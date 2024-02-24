@@ -3,6 +3,7 @@ package com.kirayim.jark;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.net.URI;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -20,6 +21,9 @@ public class HttpExchangeRequest implements Request {
     byte[] rawBody;
 
     boolean gotBody = false;
+    boolean gotQuery = false;
+
+    Map<String, String> queryItems = new HashMap<>();
 
     public HttpExchangeRequest(HttpExchange exchange, String basePath) {
         this.exchange = exchange;
@@ -46,6 +50,33 @@ public class HttpExchangeRequest implements Request {
             gotBody = true;
         }
     }
+
+    // ===========================================================================
+
+    public synchronized void checkQuery() {
+        if (gotQuery == false) {
+            URI uri = exchange.getRequestURI();
+            String query = uri.getQuery();
+
+            if (query.startsWith("?")) {
+                query = query.substring(1);
+            }
+
+            String[] parts = query.split("&");
+
+            for (String part: parts) {
+                if (part.contains("=")) {
+                    String[] pair = part.split("=");
+                    queryItems.put(pair[0], pair[1]);
+                } else {
+                    queryItems.put(part, null);
+                }
+            }
+        }
+    }
+
+    // ===========================================================================
+
 
     @Override
     public String body() {
@@ -135,29 +166,94 @@ public class HttpExchangeRequest implements Request {
         return exchange;
     }
 
+    @Override
+    public Map<String, Object> attributes() {
+        return exchange.getHttpContext().getAttributes();
+    }
 
-//attributes();             // the attributes list
-//attribute("foo");         // value of foo attribute
-//attribute("A", "V");      // sets value of attribute A to V
-//contentLength();          // length of request body
-//contentType();            // content type of request.body
+    @Override
+    public Object attribute(String key) {
+        return exchange.getHttpContext().getAttributes().get(key);
+    }
+
+    @Override
+    public void attribute(String key, Object value) {
+        exchange.getHttpContext().getAttributes().put(key, value);
+    }
+
+    @Override
+    public List<String> headers(String key) {
+        return exchange.getRequestHeaders().get(key);
+    }
+
+    @Override
+    public String host() {
+        return exchange.getRemoteAddress().getHostName();
+    }
+
+    @Override
+    public String ip() {
+        return exchange.getRemoteAddress().getAddress().toString();
+    }
+
+    @Override
+    public int port() {
+        return exchange.getRemoteAddress().getPort();
+    }
+
+    @Override
+    public Object raw() {
+        return exchange;
+    }
+
+    @Override
+    public String protocol() {
+        return exchange.getProtocol();
+    }
+
+    @Override
+    public String scheme() {
+        return null;
+    }
+
+    public String requestMethod() {
+        return exchange.getRequestMethod();
+    }
+
+    public String contentType() {
+        return exchange.getRequestHeaders().getFirst("Content-Type");
+    }
+
+    public Map<String, String> queryMap() {
+        checkQuery();
+        return queryItems;
+    }
+
+    public Map<String, String> queryMap(String key) {
+        checkQuery();
+        if (queryMap().containsKey(key)) {
+            return Map.of(key, queryItems.get(key));
+        }
+
+        return null;
+    }
+
+    public String queryParamsValues(String key) {
+        checkQuery();
+        return queryMap().get(key);
+    }
+
 //contextPath();            // the context path, e.g. "/hello"
 //cookies();                // request cookies sent by the client
-//headers();                // the HTTP header list
-//headers("BAR");           // value of BAR header
-//host();                   // the host, e.g. "example.com"
-//ip();                     // client IP address
 //params("foo");            // value of foo path parameter
 //params();                 // map with all parameters
 //pathInfo();               // the path info
-//port();                   // the server port
 //protocol();               // the protocol, e.g. HTTP/1.1
 //queryMap();               // the query map
 //queryMap("foo");          // query map for a certain parameter
 //queryParams();            // the query param list
 //queryParams("FOO");       // value of FOO query param
 //queryParamsValues("FOO")  // all values of FOO query param
-//raw();                    // raw request handed in by Jetty
 //requestMethod();          // The HTTP method (GET, ..etc)
 //scheme();                 // "http"
 //servletPath();            // the servlet path, e.g. /result.jsp
