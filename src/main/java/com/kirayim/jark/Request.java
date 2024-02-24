@@ -2,9 +2,12 @@ package com.kirayim.jark;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Map;
 
 public interface Request {
-    String body() throws Exception;
+    String body();
+
+    byte[] bodyAsBytes();
 
     HttpMethod getMethod();
 
@@ -26,5 +29,15 @@ public interface Request {
 
     void setAcceptTypes(List<String> acceptTypes);
 
+    /**
+     * Return server's context or exchange object. Deepnds on type of server.
+     * For Built-in, this is the HttpExchange
+     * <br/>Note that this is different from SparkJava's getRequest
+     * @return
+     */
     Object getContext();
+
+    int contentLength();
+
+    Map<String, List<String>> headers();
 }

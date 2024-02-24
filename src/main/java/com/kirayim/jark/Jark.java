@@ -50,6 +50,8 @@ public class Jark implements Closeable, HttpHandler {
     String truststorePassword;
     boolean needsClientCert;
 
+    public Jark staticFiles = this;
+
     // ===========================================================================
 
     public static Jark ignite() {
@@ -72,28 +74,63 @@ public class Jark implements Closeable, HttpHandler {
         } else {
             File tryFileName = new File(fileName);
 
+            if (tryFileName.exists() == false && fileName.startsWith("/")) {
+                tryFileName = new File(fileName.substring(1));
+            }
+
             if (tryFileName.exists()) {
                 return new FileInputStream(tryFileName);
             }
+
         }
 
         InputStream resourceStream = ClassLoader.getSystemResourceAsStream(fileName);
 
         if (resourceStream == null) {
-            // Try with both slash types.
-            fileName = fileName.replace("/", "\\");
-            resourceStream = ClassLoader.getSystemResourceAsStream(fileName);
+            if (fileName.startsWith("/")) {
+                resourceStream = ClassLoader.getSystemResourceAsStream(fileName.substring(1));
+            }
+
             if (resourceStream == null) {
-                fileName = fileName.replace("\\", "/");
+                // Try with both slash types.
+                fileName = fileName.replace("/", "\\");
                 resourceStream = ClassLoader.getSystemResourceAsStream(fileName);
                 if (resourceStream == null) {
-                    // It really doesn't exist.
-                    throw new FileNotFoundException("No file found at: " + fileName);
+                    fileName = fileName.replace("\\", "/");
+                    resourceStream = ClassLoader.getSystemResourceAsStream(fileName);
                 }
             }
         }
 
         return resourceStream;
+    }
+
+    // ===========================================================================
+
+    public void handleStaticContent(JarkStaticContent target, HttpExchange exchange, Request request, Response response) throws Exception {
+        if (target.getTarget() instanceof String stringTarget) {
+
+            String path = request.getPath();
+
+            if (path.startsWith(target.getPath())) {
+                path = path.substring(target.getPath().length());
+            }
+
+            if (stringTarget.endsWith("/")) {
+                stringTarget = stringTarget + path;
+            }
+
+            try (var in = loadResourceAsStream(stringTarget)) {
+                if (in != null) {
+                    byte[] inputData = in.readAllBytes(); // Sorry - need to read it all in so we know how long it is
+                    exchange.sendResponseHeaders(200, inputData.length);
+                    var out = exchange.getResponseBody();
+                    out.write(inputData);
+                    out.close();
+                    exchange.close();
+                }
+            }
+        }
     }
 
     // ===========================================================================
@@ -248,11 +285,18 @@ public class Jark implements Closeable, HttpHandler {
     // ===========================================================================
 
     List<JarkRoute> filterRoutes(HttpExchangeRequest request, List<JarkRoute> routes) {
+        String pathWithleadingSlash = "/" + request.path();
+        String pathWithTrainingSlash = request.path() + "/";
 
         return routes.stream()
-                .filter(p -> p.path() == null || request.path().startsWith(p.path()))
-                .filter(p -> p.httpMethod() == null || p.httpMethod() == request.method)
-                .filter(p -> (request.acceptTypes == null || request.acceptTypes.isEmpty() || request.acceptTypes.stream().anyMatch(q -> p != null && p.acceptType().equals(q))))
+                .filter(p -> p.getPath() == null
+                        || request.path().startsWith(p.getPath())
+                        || pathWithleadingSlash.startsWith(p.getPath())
+                )
+                .filter(p -> p.getHttpMethod() == null || p.getHttpMethod() == request.method)
+                .filter(p -> (request.acceptTypes == null
+                        || request.acceptTypes.isEmpty()
+                        || request.acceptTypes.stream().anyMatch(q -> p != null && p.getAcceptType().equals(q))))
                 .collect(Collectors.toList());
     }
 
@@ -283,7 +327,7 @@ public class Jark implements Closeable, HttpHandler {
     boolean executeFilters(HttpExchangeRequest request, Response response, List<JarkRoute> filters) throws IOException {
         for (var route: filterRoutes(request, filters))  {
             try {
-                switch (route.target()) {
+                switch (route.getTarget()) {
                     case null -> { }
                     case JarkFilter f -> f.handle(request, response);
                     default -> throw new Exception("No target for filter");
@@ -323,12 +367,18 @@ public class Jark implements Closeable, HttpHandler {
 
         for (var route: filteredRoutes)  {
             try {
-                switch (route.target()) {
-                    case null -> { }
-                    case JarkFilter f -> f.handle(request, response);
-                    case Route f -> results.add(f.handle(request, response));
-                    default -> throw new Exception("No target for route");
+                switch (route) {
+                    case JarkStaticContent f ->  handleStaticContent(f, exchange, request, response);
+                    case JarkRoute j -> {
+                        switch (j.getTarget()) {
+                            case null -> { }
+                            case JarkFilter f -> f.handle(request, response);
+                            case Route f -> results.add(f.handle(request, response));
+                            default -> throw new Exception("No target for route");
+                        }
+                    }
                 }
+
             } catch (Exception e) {
                 handleException(request.exchange, e);
                 return;
@@ -415,6 +465,28 @@ public class Jark implements Closeable, HttpHandler {
 
     public void ssl(SSLContext ssl) {
         this.ssl = ssl;
+    }
+
+    /**
+     * Set a base path inside yor JAR for serving static content.
+     * <br/>This serves the static content using a base URL
+     * <br/>In the words of SJ: A file /public/css/style.css is made available as http://{host}:{port}/css/style.css
+     * @param location
+     */
+    public void location(String location) {
+        routes.add(new JarkStaticContent(HttpMethod.GET, "/", null, location));
+    }
+
+    public void location(String location, String urlPath) {
+        routes.add(new JarkStaticContent(HttpMethod.GET, urlPath, null, location));
+    }
+
+    public void externalLocation(String location) {
+        routes.add(new JarkStaticContent(HttpMethod.GET, "/", null, location));
+    }
+
+    public void externalLocation(String location, String urlPath) {
+        routes.add(new JarkStaticContent(HttpMethod.GET, urlPath, null, location));
     }
 
     /**

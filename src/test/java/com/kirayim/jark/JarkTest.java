@@ -25,6 +25,40 @@ import java.util.Date;
  */
 public class JarkTest {
 
+    public SSLContext getSelfSignedAcceptingContext() throws Exception {
+        SSLContext sslContext = SSLContext.getInstance("SSL"); // OR TLS
+        sslContext.init(null, new TrustManager[]{new X509ExtendedTrustManager() {
+            @Override
+            public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException {
+            }
+
+            @Override
+            public X509Certificate[] getAcceptedIssuers() {
+                return new X509Certificate[0];
+            }
+
+            @Override
+            public void checkClientTrusted(X509Certificate[] chain, String authType, Socket socket) throws CertificateException {
+            }
+            @Override
+            public void checkServerTrusted(X509Certificate[] chain, String authType, Socket socket) throws CertificateException {
+            }
+            @Override
+            public void checkClientTrusted(X509Certificate[] chain, String authType, SSLEngine engine) throws CertificateException {
+            }
+            @Override
+            public void checkServerTrusted(X509Certificate[] chain, String authType, SSLEngine engine) throws CertificateException {
+            }
+            @Override
+            public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {
+            }
+        }}, new SecureRandom());
+
+        return sslContext;
+    }
+
+    // ===========================================================================
+
     @Test
     public void basicTest() throws Exception{
 
@@ -109,42 +143,6 @@ public class JarkTest {
             jark.secure(url.toString(), "jarkpass", url.toString(), "jarkpass");
             jark.start();
 
-            SSLContext sslContext = SSLContext.getInstance("SSL"); // OR TLS
-            sslContext.init(null, new TrustManager[]{new X509ExtendedTrustManager() {
-                @Override
-                public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException {
-                }
-
-                @Override
-                public X509Certificate[] getAcceptedIssuers() {
-                    return new X509Certificate[0];
-                }
-
-                @Override
-                public void checkClientTrusted(X509Certificate[] chain, String authType, Socket socket) throws CertificateException {
-
-                }
-
-                @Override
-                public void checkServerTrusted(X509Certificate[] chain, String authType, Socket socket) throws CertificateException {
-
-                }
-
-                @Override
-                public void checkClientTrusted(X509Certificate[] chain, String authType, SSLEngine engine) throws CertificateException {
-
-                }
-
-                @Override
-                public void checkServerTrusted(X509Certificate[] chain, String authType, SSLEngine engine) throws CertificateException {
-
-                }
-
-                @Override
-                public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {
-
-                }
-            }}, new SecureRandom());
 
             var request = HttpRequest.newBuilder()
                     .GET()
@@ -153,11 +151,39 @@ public class JarkTest {
 
             var client = HttpClient
                     .newBuilder()
-                    .sslContext(sslContext)
+                    .sslContext(getSelfSignedAcceptingContext())
                     .build();
             var response = client.send(request, HttpResponse.BodyHandlers.ofString());
-
             assertEquals("Simple Get should return \"test\"", "test", response.body());
+        }
+    }
+
+    // ===========================================================================
+
+    @Test
+    public void staticContentTest() throws Exception {
+        try (Jark jark = Jark.ignite()) {
+            jark.location("/");
+            jark.location("/", "/path");
+            jark.start();
+
+            var client = HttpClient.newHttpClient();
+            var request = HttpRequest.newBuilder()
+                    .GET()
+                    .uri(URI.create("http://localhost:4567/TestDataResource.html"))
+                    .build();
+
+            var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            assertTrue("Simple Get should return \"test\"", response.body().contains("Yes - there is some text"));
+
+            // TODO: Still doesn't work
+//            request = HttpRequest.newBuilder()
+//                    .GET()
+//                    .uri(URI.create("http://localhost:4567/path/TestDataResource.html"))
+//                    .build();
+//
+//            response = client.send(request, HttpResponse.BodyHandlers.ofString());
+//            assertTrue("Simple Get should return \"test\"", response.body().contains("Yes - there is some text"));
         }
     }
 }
