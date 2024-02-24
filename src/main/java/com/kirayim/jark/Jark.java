@@ -1,13 +1,15 @@
 package com.kirayim.jark;
 
 import com.sun.net.httpserver.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
+import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
-import java.io.Closeable;
-import java.io.IOException;
+import javax.net.ssl.TrustManagerFactory;
+import java.io.*;
 import java.net.InetSocketAddress;
+import java.nio.file.Path;
+import java.security.KeyStore;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executor;
@@ -20,7 +22,6 @@ import java.util.stream.Collectors;
  */
 public class Jark implements Closeable, HttpHandler {
 
-    private static final Logger logger = LoggerFactory.getLogger(Jark.class);
     protected static final String DEFAULT_ACCEPT_TYPE = "*/*";
     protected boolean initialized = false;
     protected int port = 4567;
@@ -41,6 +42,14 @@ public class Jark implements Closeable, HttpHandler {
 
     HttpContext context;
 
+
+    String keystoreFile;
+    String keystorePassword;
+    String certAlias;
+    String truststoreFile;
+    String truststorePassword;
+    boolean needsClientCert;
+
     // ===========================================================================
 
     public static Jark ignite() {
@@ -49,6 +58,72 @@ public class Jark implements Closeable, HttpHandler {
 
     public Jark() {
     }
+
+    // ===========================================================================
+
+    public InputStream loadResourceAsStream(String fileName) throws Exception {
+
+        if (fileName.startsWith("file:")) {
+            File tryFileName = new File(fileName.substring(5));
+
+            if (tryFileName.exists()) {
+                return new FileInputStream(tryFileName);
+            }
+        } else {
+            File tryFileName = new File(fileName);
+
+            if (tryFileName.exists()) {
+                return new FileInputStream(tryFileName);
+            }
+        }
+
+        InputStream resourceStream = ClassLoader.getSystemResourceAsStream(fileName);
+
+        if (resourceStream == null) {
+            // Try with both slash types.
+            fileName = fileName.replace("/", "\\");
+            resourceStream = ClassLoader.getSystemResourceAsStream(fileName);
+            if (resourceStream == null) {
+                fileName = fileName.replace("\\", "/");
+                resourceStream = ClassLoader.getSystemResourceAsStream(fileName);
+                if (resourceStream == null) {
+                    // It really doesn't exist.
+                    throw new FileNotFoundException("No file found at: " + fileName);
+                }
+            }
+        }
+
+        return resourceStream;
+    }
+
+    // ===========================================================================
+
+    public void setupSSl() throws Exception {
+        KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
+
+        try (InputStream tStore = loadResourceAsStream(truststoreFile)) {
+            trustStore.load(tStore, truststorePassword == null ? new char[0]  : keystorePassword.toCharArray());
+        }
+
+        TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+        tmf.init(trustStore);
+
+
+        KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+        KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+
+        try (InputStream tStore = loadResourceAsStream(keystoreFile)) {
+            keyStore.load(tStore, keystorePassword == null ? new char[0] : keystorePassword.toCharArray());
+        }
+
+        kmf.init(keyStore, keystorePassword == null ? new char[0] :  keystorePassword.toCharArray());
+
+        synchronized (this) {
+            ssl = SSLContext.getInstance("TLS");
+            ssl.init(kmf.getKeyManagers(), tmf.getTrustManagers(), new SecureRandom());
+        }
+    }
+
 
     // ===========================================================================
 
@@ -85,7 +160,7 @@ public class Jark implements Closeable, HttpHandler {
                 this.notifyAll();
             }
         } catch (Exception e) {
-            logger.error("Couldn't stop Jark server", e);
+            // Ignore
         }
     }
 
@@ -172,17 +247,13 @@ public class Jark implements Closeable, HttpHandler {
 
     // ===========================================================================
 
-    List<JarkRoute> filterRoutes(Request request, List<JarkRoute> routes) {
+    List<JarkRoute> filterRoutes(HttpExchangeRequest request, List<JarkRoute> routes) {
 
-        var stream = routes.stream()
+        return routes.stream()
                 .filter(p -> p.path() == null || request.path().startsWith(p.path()))
-                .filter(p -> p.httpMethod() == null || p.httpMethod() == request.method);
-
-        if (request.acceptTypes != null && request.acceptTypes.isEmpty() == false) {
-            stream.filter(p -> request.acceptTypes.stream().anyMatch(q -> p.acceptType().equals(q)));
-        }
-
-        return stream.collect(Collectors.toList());
+                .filter(p -> p.httpMethod() == null || p.httpMethod() == request.method)
+                .filter(p -> (request.acceptTypes == null || request.acceptTypes.isEmpty() || request.acceptTypes.stream().anyMatch(q -> p != null && p.acceptType().equals(q))))
+                .collect(Collectors.toList());
     }
 
     // ===========================================================================
@@ -209,7 +280,7 @@ public class Jark implements Closeable, HttpHandler {
 
     // ===========================================================================
 
-    boolean executeFilters(Request request, Response response, List<JarkRoute> filters) throws IOException {
+    boolean executeFilters(HttpExchangeRequest request, Response response, List<JarkRoute> filters) throws IOException {
         for (var route: filterRoutes(request, filters))  {
             try {
                 switch (route.target()) {
@@ -230,8 +301,8 @@ public class Jark implements Closeable, HttpHandler {
 
     public void handle(HttpExchange exchange) throws IOException {
 
-        Request request = new Request(exchange, basePath);
-        Response response = new Response(exchange);
+        HttpExchangeRequest request = new HttpExchangeRequest(exchange, basePath);
+        Response response = new HttpExchangeResponse(exchange);
 
         if (executeFilters(request, response, beforeFilters) == false) {
             return;
@@ -340,6 +411,130 @@ public class Jark implements Closeable, HttpHandler {
 
     public void setSsl(SSLContext ssl) {
         this.ssl = ssl;
+    }
+
+    public void ssl(SSLContext ssl) {
+        this.ssl = ssl;
+    }
+
+    /**
+     * Set the connection to be secure, using the specified keystore and
+     * truststore. This has to be called before any route mapping is done. You
+     * have to supply a keystore file, truststore file is optional (keystore
+     * will be reused). By default, client certificates are not checked.
+     * This method is only relevant when using embedded Jetty servers. It should
+     * not be used if you are using Servlets, where you will need to secure the
+     * connection in the servlet container
+     *
+     * @param keystoreFile       The keystore file location as string
+     * @param keystorePassword   the password for the keystore
+     * @param truststoreFile     the truststore file location as string, leave null to reuse
+     *                           keystore
+     * @param truststorePassword the trust store password
+     * @return the object with connection set to be secure
+     */
+    public synchronized Jark secure(String keystoreFile,
+                                       String keystorePassword,
+                                       String truststoreFile,
+                                       String truststorePassword) throws Exception {
+        return secure(keystoreFile, keystorePassword, null, truststoreFile, truststorePassword, false);
+    }
+
+    /**
+     * Set the connection to be secure, using the specified keystore and
+     * truststore. This has to be called before any route mapping is done. You
+     * have to supply a keystore file, truststore file is optional (keystore
+     * will be reused). By default, client certificates are not checked.
+     * This method is only relevant when using embedded Jetty servers. It should
+     * not be used if you are using Servlets, where you will need to secure the
+     * connection in the servlet container
+     *
+     * @param keystoreFile       The keystore file location as string
+     * @param keystorePassword   the password for the keystore
+     * @param certAlias          the default certificate Alias
+     * @param truststoreFile     the truststore file location as string, leave null to reuse
+     *                           keystore
+     * @param truststorePassword the trust store password
+     * @return the object with connection set to be secure
+     */
+    public synchronized Jark secure(String keystoreFile,
+                                       String keystorePassword,
+                                       String certAlias,
+                                       String truststoreFile,
+                                       String truststorePassword) throws Exception  {
+        return secure(keystoreFile, keystorePassword, certAlias, truststoreFile, truststorePassword, false);
+    }
+
+    /**
+     * Set the connection to be secure, using the specified keystore and
+     * truststore. This has to be called before any route mapping is done. You
+     * have to supply a keystore file, truststore file is optional (keystore
+     * will be reused).
+     * This method is only relevant when using embedded Jetty servers. It should
+     * not be used if you are using Servlets, where you will need to secure the
+     * connection in the servlet container
+     *
+     * @param keystoreFile       The keystore file location as string
+     * @param keystorePassword   the password for the keystore
+     * @param truststoreFile     the truststore file location as string, leave null to reuse
+     *                           keystore
+     * @param needsClientCert    Whether to require client certificate to be supplied in
+     *                           request
+     * @param truststorePassword the trust store password
+     * @return the object with connection set to be secure
+     */
+    public synchronized Jark secure(String keystoreFile,
+                                       String keystorePassword,
+                                       String truststoreFile,
+                                       String truststorePassword,
+                                       boolean needsClientCert) throws Exception {
+        return secure(keystoreFile, keystorePassword, null, truststoreFile, truststorePassword, needsClientCert);
+    }
+
+    /**
+     * Set the connection to be secure, using the specified keystore and
+     * truststore. This has to be called before any route mapping is done. You
+     * have to supply a keystore file, truststore file is optional (keystore
+     * will be reused).
+     * This method is only relevant when using embedded Jetty servers. It should
+     * not be used if you are using Servlets, where you will need to secure the
+     * connection in the servlet container
+     *
+     * @param keystoreFile       The keystore file location as string
+     * @param keystorePassword   the password for the keystore
+     * @param certAlias          the default certificate Alias
+     * @param truststoreFile     the truststore file location as string, leave null to reuse
+     *                           keystore
+     * @param needsClientCert    Whether to require client certificate to be supplied in
+     *                           request
+     * @param truststorePassword the trust store password
+     * @return the object with connection set to be secure
+     */
+    public synchronized Jark secure(String keystoreFile,
+                                       String keystorePassword,
+                                       String certAlias,
+                                       String truststoreFile,
+                                       String truststorePassword,
+                                       boolean needsClientCert) throws Exception {
+        if (server != null) {
+            throw new IllegalStateException("Server already running");
+        }
+
+        if (keystoreFile == null) {
+            throw new IllegalArgumentException(
+                    "Must provide a keystore file to run secured");
+        }
+
+        this.keystoreFile = keystoreFile;
+        this.keystorePassword  = keystorePassword;
+        this.certAlias = certAlias;
+        this.truststoreFile  = truststoreFile;
+        this.truststorePassword  = truststorePassword;
+        this.needsClientCert  =  needsClientCert;
+
+        setupSSl();
+
+        return this;
     }
 
     public static Executor getExecutor() {

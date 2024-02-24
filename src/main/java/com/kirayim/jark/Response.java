@@ -1,32 +1,11 @@
 package com.kirayim.jark;
 
-import com.sun.net.httpserver.HttpExchange;
+public interface Response {
+    int getStatus();
 
-public class Response {
-    HttpExchange exchange;
-    int status = 200;
+    void status(int status);
 
-    public Response(HttpExchange exchange) {
-        this.exchange = exchange;
-    }
+    void setStatus(int status);
 
-    public HttpExchange getExchange() {
-        return exchange;
-    }
-
-    public void setExchange(HttpExchange exchange) {
-        this.exchange = exchange;
-    }
-
-    public int getStatus() {
-        return status;
-    }
-
-    public void status(int status) {
-        this.status = status;
-    }
-
-    public void setStatus(int status) {
-        this.status = status;
-    }
+    Object getContext();
 }
