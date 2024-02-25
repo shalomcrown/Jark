@@ -4,7 +4,7 @@
 
   <groupId>com.kirayim</groupId>
   <artifactId>Jark</artifactId>
-  <version>0.1</version>
+  <version>0.2-SNAPSHOT</version>
   <packaging>jar</packaging>
 
   <name>Jark</name>
@@ -77,5 +77,9 @@
       <id>airo-nexus-snapshots</id>
       <url>https://nexus.az.autodrones4biz.com/repository/maven-snapshots/</url>
     </snapshotRepository>
+    <repository>
+      <id>airo-nexus-releases</id>
+      <url>https://nexus.az.autodrones4biz.com/repository/maven-releases/</url>
+    </repository>
   </distributionManagement>
 </project>
