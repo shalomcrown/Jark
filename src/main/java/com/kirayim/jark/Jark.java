@@ -639,4 +639,13 @@ public class Jark implements Closeable, HttpHandler {
     public static void setExecutor(Executor executor) {
         Jark.executor = executor;
     }
+
+    /**
+     * Set thread pool size. This is ignored by Jark as it uses
+     * a virtual thread executor.
+     * @param poolSize
+     */
+    public void threadPool(int poolSize) {
+        // Ignored - uses virtual threads
+    }
 }

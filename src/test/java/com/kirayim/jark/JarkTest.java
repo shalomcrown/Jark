@@ -82,8 +82,8 @@ public class JarkTest {
                         var write = new ObjectOutputStream(out)) {
                     write.writeLong(nowMillis);
                     write.flush();
-
                     q.body(out.toByteArray());
+                    q.type("application/octet-stream");
                 }
                 return null;
 
@@ -152,6 +152,7 @@ public class JarkTest {
                     .build();
 
             var in = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            assertEquals("Expect correct content type", in.headers().firstValue("Content-type").get(), "application/octet-stream");
             var obj = new ObjectInputStream(in.body());
             long time = obj.readLong();
             assertEquals("Body should be binary time", time, nowMillis);
