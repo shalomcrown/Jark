@@ -8,6 +8,10 @@ import javax.net.ssl.X509ExtendedTrustManager;
 
 import static org.junit.Assert.*;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.net.Authenticator;
 import java.net.Socket;
 import java.net.URI;
@@ -61,6 +65,7 @@ public class JarkTest {
 
     @Test
     public void basicTest() throws Exception{
+        final long nowMillis = System.currentTimeMillis();
 
         try (Jark jark = Jark.ignite()) {
             jark.get("/test", (p, q) -> "test");
@@ -71,6 +76,18 @@ public class JarkTest {
             }); // Use body twice.
             jark.get("/whats_the_time", "text/plain", (p, q) -> new Date().toString());
             jark.get("/whats_the_time", "application/json", (p, q) -> String.format("{\"time\":\"%1$TFT%1$TT %1$TZ\"}", new Date()));
+
+            jark.get("/whats_the_time", "application/octet-stream", (p, q) -> {
+                try (var out = new ByteArrayOutputStream();
+                        var write = new ObjectOutputStream(out)) {
+                    write.writeLong(nowMillis);
+                    write.flush();
+
+                    q.body(out.toByteArray());
+                }
+                return null;
+
+            });
             jark.start();
 
             var request = HttpRequest.newBuilder()
@@ -127,6 +144,17 @@ public class JarkTest {
 
             response = client.send(request, HttpResponse.BodyHandlers.ofString());
             assertTrue("Body should be JSON:" + response.body(), response.body().contains("{"));
+
+            request = HttpRequest.newBuilder()
+                    .GET()
+                    .uri(URI.create("http://localhost:4567/whats_the_time"))
+                    .header("Accept", "application/octet-stream")
+                    .build();
+
+            var in = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            var obj = new ObjectInputStream(in.body());
+            long time = obj.readLong();
+            assertEquals("Body should be binary time", time, nowMillis);
         }
     }
 

@@ -11,10 +11,12 @@ import java.nio.file.Path;
 import java.security.KeyStore;
 import java.security.SecureRandom;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Hello world!
@@ -353,6 +355,7 @@ public class Jark implements Closeable, HttpHandler {
         }
 
         List<Object> results = new ArrayList<>();
+        List<byte[]> binaryResults = new ArrayList<>();
 
         List<JarkRoute> filteredRoutes = filterRoutes(request, routes);
 
@@ -373,7 +376,12 @@ public class Jark implements Closeable, HttpHandler {
                         switch (j.getTarget()) {
                             case null -> { }
                             case JarkFilter f -> f.handle(request, response);
-                            case Route f -> results.add(f.handle(request, response));
+                            case Route f -> {
+                                results.add(f.handle(request, response));
+                                if (response.body() != null) {
+                                    binaryResults.add(response.body());
+                                }
+                            }
                             default -> throw new Exception("No target for route");
                         }
                     }
@@ -391,16 +399,31 @@ public class Jark implements Closeable, HttpHandler {
 
         if (exchange.getResponseCode() == -1) {
             int byteCount = 0;
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            String stringData;
 
-            String string = results.stream()
-                    .map(p -> p.toString())
-                    .reduce("", (p, q) -> p + q);
+            if (results.isEmpty() == false) {
+                for (Object result : results) {
+                    switch (result) {
+                        case null -> {}
+                        case String s -> bytes.write(s.getBytes());
+                        default -> bytes.write(result.toString().getBytes());
+                    }
+                }
+            }
 
-            byte[] bytes =  string.getBytes();
-            byteCount += bytes.length;
+            if (binaryResults.isEmpty() == false) {
+                for (byte[] result : binaryResults) {
+                    if (result != null) {
+                        bytes.write(result);
+                    }
+                }
+            }
+
+            byteCount += bytes.size();
 
             exchange.sendResponseHeaders(response.getStatus(), byteCount);
-            exchange.getResponseBody().write(bytes);
+            exchange.getResponseBody().write(bytes.toByteArray());
         }
 
         exchange.close();

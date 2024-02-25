@@ -8,4 +8,10 @@ public interface Response {
     void setStatus(int status);
 
     Object getContext();
+
+    void body(String bodyString);
+
+    void body(byte[] bodyBytes);
+
+    byte[] body();
 }

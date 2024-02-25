@@ -6,6 +6,10 @@ public class HttpExchangeResponse implements Response {
     HttpExchange exchange;
     int status = 200;
 
+    byte[] body = null;
+
+    String bodyString = null;
+
     public HttpExchangeResponse(HttpExchange exchange) {
         this.exchange = exchange;
     }
@@ -36,5 +40,20 @@ public class HttpExchangeResponse implements Response {
     @Override
     public Object getContext() {
         return exchange;
+    }
+
+    @Override
+    public void body(String bodyString) {
+        body = bodyString.getBytes();
+    }
+
+    @Override
+    public void body(byte[] bodyBytes) {
+        body = bodyBytes;
+    }
+
+    @Override
+    public byte[] body() {
+        return body;
     }
 }
