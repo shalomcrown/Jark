@@ -49,7 +49,7 @@ implementation This allows them to be matched as specified.
 ## Implementation status
 * Basic operations work
 * Filters aren't tested
-* SSL works (use `secure()` function)
+* SSL works (use `secure()` function), though not tested with keystore as resource.
 * Serving static content using 'location()' or 'externalLocation()' works partially. Note that there
 is no difference between these functions, Jark tries to serve files from both the JARs and the file 
 system, whichever it finds.
@@ -62,6 +62,7 @@ system, whichever it finds.
 * Sessions
 * `halt()`
 * `redirect()`
+* GZip body support
 
 ## Later
 * The code should detect provided Jetty or Grizzly libraries and use these instead of the 
