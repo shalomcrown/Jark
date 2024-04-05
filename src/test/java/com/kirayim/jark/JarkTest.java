@@ -8,10 +8,7 @@ import javax.net.ssl.X509ExtendedTrustManager;
 
 import static org.junit.Assert.*;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
+import java.io.*;
 import java.net.Authenticator;
 import java.net.Socket;
 import java.net.URI;
@@ -23,6 +20,7 @@ import java.security.SecureRandom;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Date;
+import java.util.stream.StreamSupport;
 
 /**
  * Unit test for simple App.
@@ -190,7 +188,7 @@ public class JarkTest {
     // ===========================================================================
 
     @Test
-    public void staticContentTest() throws Exception {
+    public void staticContentTestResource() throws Exception {
         try (Jark jark = Jark.ignite()) {
             jark.location("/");
             jark.location("/", "/path");
@@ -205,14 +203,47 @@ public class JarkTest {
             var response = client.send(request, HttpResponse.BodyHandlers.ofString());
             assertTrue("Simple Get should return \"test\"", response.body().contains("Yes - there is some text"));
 
-            // TODO: Still doesn't work
-//            request = HttpRequest.newBuilder()
-//                    .GET()
-//                    .uri(URI.create("http://localhost:4567/path/TestDataResource.html"))
-//                    .build();
-//
-//            response = client.send(request, HttpResponse.BodyHandlers.ofString());
-//            assertTrue("Simple Get should return \"test\"", response.body().contains("Yes - there is some text"));
+            request = HttpRequest.newBuilder()
+                    .GET()
+                    .uri(URI.create("http://localhost:4567/path/TestDataResource.html"))
+                    .build();
+
+            response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            assertTrue("Simple Get should return \"test\"", response.body().contains("Yes - there is some text"));
+        }
+    }
+
+    // ===========================================================================
+
+    @Test
+    public void staticContentTestFileSystem() throws Exception {
+        try (Jark jark = Jark.ignite()) {
+            jark.location("/tmp");
+            jark.location("/tmp", "/path");
+            jark.start();
+
+            try (InputStream in = ClassLoader.getSystemResourceAsStream("TestDataResource.html");
+                                OutputStream out = new FileOutputStream("/tmp/TestDataFile.html");) {
+
+                in.transferTo(out);
+            }
+
+            var client = HttpClient.newHttpClient();
+            var request = HttpRequest.newBuilder()
+                    .GET()
+                    .uri(URI.create("http://localhost:4567/TestDataFile.html"))
+                    .build();
+
+            var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            assertTrue("Simple Get should return \"test\"", response.body().contains("Yes - there is some text"));
+
+            request = HttpRequest.newBuilder()
+                    .GET()
+                    .uri(URI.create("http://localhost:4567/path/TestDataFile.html"))
+                    .build();
+
+            response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            assertTrue("Simple Get should return \"test\"", response.body().contains("Yes - there is some text"));
         }
     }
 }

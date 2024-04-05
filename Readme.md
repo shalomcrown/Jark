@@ -46,18 +46,27 @@ the final body after all the return values from the routes.
 Filters are executed using code in the jark library, rather than delegating them to the server 
 implementation This allows them to be matched as specified.
 
+Since there are no dependencies, it is impossible to include a library like Jackson to convert objects 
+to JSON before returning them (or accepting them)
+
+Also URL path parameters aren't implemented, though that should be easy and nice, provided they can be
+given as strings.
+
 ## Implementation status
 * Basic operations work
-* Filters aren't tested
+* Filters aren't tested very well
 * SSL works (use `secure()` function), though not tested with keystore as resource.
-* Serving static content using 'location()' or 'externalLocation()' works partially. Note that there
+* Serving static content using 'location()' or 'externalLocation()' works fairly well. Note that there
 is no difference between these functions, Jark tries to serve files from both the JARs and the file 
-system, whichever it finds.
+system, whichever it finds. In general the search order is
+ _ File system path as concatenation of target and remaing part of URL after removing path component
+ _ Same without leading '/' - in other words starting a current working folder instead of root
+ _ Same as resource
+ _ Same as resource without leading "/"
+ _ Same with forward slashed replace by backslashes  
 * Much of the 'Request' and 'Response' are implemented
 
 ## Plans / missing
-* Response headers
-* Finish the static content service
 * Built-in Authentication system
 * Sessions
 * `halt()`

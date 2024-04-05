@@ -8,6 +8,7 @@
   <packaging>jar</packaging>
 
   <name>Jark</name>
+  <description>A simple REST inteface for Java 21 with no external dependencies</description>
   <url>https://github.com/shalomcrown/Jark</url>
 
   <licenses>
@@ -18,8 +19,19 @@
     </license>
   </licenses>
 
+  <developers>
+    <developer>
+      <id>rF3noYxG</id>
+      <name>Shalom Crown</name>
+      <email>shalomcrown@gmail.com</email>
+    </developer>
+  </developers>
+
   <scm>
-    <url>https://github.com/shalomcrown/Jark.git</url>
+    <connection>scm:git:git@github.com:org/Jark.git</connection>
+    <developerConnection>scm:git:git@github.com:org/Jark.git</developerConnection>
+    <url>hhttps://github.com/shalomcrown/Jark.git</url>
+    <tag>HEAD</tag>
   </scm>
 
   <properties>
@@ -54,8 +66,8 @@
           </execution>
         </executions>
         <configuration>
-          <serverId>airo-nexus-snapshots</serverId>
-          <nexusUrl>https://nexus.az.autodrones4biz.com/repository/maven-snapshots/</nexusUrl>
+          <serverId>sonatype-oss</serverId>
+          <nexusUrl>https://s01.oss.sonatype.org</nexusUrl>
           <skipStaging>true</skipStaging>
         </configuration>
       </plugin>
@@ -72,14 +84,111 @@
   </dependencies>
 
 
+  <profiles>
+    <profile>
+      <id>release</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <version>3.1.0</version>
+            <configuration>
+              <gpgArguments>
+                <arg>--pinentry-mode</arg>
+                <arg>loopback</arg>
+              </gpgArguments>
+            </configuration>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <phase>verify</phase>
+                <goals>
+                  <goal>sign</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+
+
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-source-plugin</artifactId>
+            <version>3.2.1</version>
+            <executions>
+              <execution>
+                <id>attach-sources</id>
+                <goals>
+                  <goal>jar-no-fork</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-javadoc-plugin</artifactId>
+            <version>3.4.0</version>
+            <executions>
+              <execution>
+                <id>attach-javadocs</id>
+                <goals>
+                  <goal>jar</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-release-plugin</artifactId>
+            <version>2.5.3</version>
+            <configuration>
+              <autoVersionSubmodules>true</autoVersionSubmodules>
+              <tagNameFormat>@{project.version}</tagNameFormat>
+              <pushChanges>false</pushChanges>
+              <localCheckout>true</localCheckout>
+              <remoteTagging>false</remoteTagging>
+              <arguments>-DskipTests=true</arguments>
+            </configuration>
+          </plugin>
+
+          <plugin>
+            <groupId>org.sonatype.plugins</groupId>
+            <artifactId>nexus-staging-maven-plugin</artifactId>
+            <version>1.6.13</version>
+            <extensions>true</extensions>
+            <configuration>
+              <nexusUrl>https://s01.oss.sonatype.org/</nexusUrl>
+              <serverId>sonatype-oss</serverId>
+              <autoReleaseAfterClose>true</autoReleaseAfterClose>
+              <stagingProgressTimeoutMinutes>60</stagingProgressTimeoutMinutes>
+            </configuration>
+          </plugin>
+
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+
   <distributionManagement>
-    <snapshotRepository>
-      <id>airo-nexus-snapshots</id>
-      <url>https://nexus.az.autodrones4biz.com/repository/maven-snapshots/</url>
-    </snapshotRepository>
-    <repository>
-      <id>airo-nexus-releases</id>
-      <url>https://nexus.az.autodrones4biz.com/repository/maven-releases/</url>
-    </repository>
-  </distributionManagement>
+<!--    <snapshotRepository>-->
+<!--      <id>airo-nexus-snapshots</id>-->
+<!--      <url>https://nexus.az.autodrones4biz.com/repository/maven-snapshots/</url>-->
+<!--    </snapshotRepository>-->
+<!--    <repository>-->
+<!--      <id>airo-nexus-releases</id>-->
+<!--      <url>https://nexus.az.autodrones4biz.com/repository/maven-releases/</url>-->
+<!--    </repository>-->
+
+      <snapshotRepository>
+        <id>sonatype-oss</id>
+        <url>https://oss.sonatype.org/content/repositories/snapshots/</url>
+      </snapshotRepository>
+
+      <repository>
+        <id>sonatype-oss</id>
+        <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+      </repository>
+    </distributionManagement>
 </project>

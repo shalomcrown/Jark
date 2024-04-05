@@ -83,7 +83,6 @@ public class Jark implements Closeable, HttpHandler {
             if (tryFileName.exists()) {
                 return new FileInputStream(tryFileName);
             }
-
         }
 
         InputStream resourceStream = ClassLoader.getSystemResourceAsStream(fileName);
@@ -116,10 +115,26 @@ public class Jark implements Closeable, HttpHandler {
 
             if (path.startsWith(target.getPath())) {
                 path = path.substring(target.getPath().length());
+
+            } else if (target.getPath().startsWith("/")) {
+                String targetNoSlash = target.getPath().substring(1);
+                if (path.startsWith(targetNoSlash)) {
+                    path = path.substring((targetNoSlash.length()));
+                }
             }
 
             if (stringTarget.endsWith("/")) {
-                stringTarget = stringTarget + path;
+                if (path.startsWith("/")) {
+                    stringTarget = stringTarget + path.substring(1);
+                } else {
+                    stringTarget = stringTarget + path;
+                }
+            } else {
+                if (path.startsWith("/")) {
+                    stringTarget = stringTarget + path;
+                } else {
+                    stringTarget = stringTarget + "/" + path;
+                }
             }
 
             try (var in = loadResourceAsStream(stringTarget)) {
