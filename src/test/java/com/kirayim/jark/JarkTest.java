@@ -19,6 +19,7 @@ import java.net.http.HttpResponse;
 import java.security.SecureRandom;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.time.Duration;
 import java.util.Date;
 import java.util.stream.StreamSupport;
 
@@ -180,6 +181,30 @@ public class JarkTest {
                     .newBuilder()
                     .sslContext(getSelfSignedAcceptingContext())
                     .build();
+            var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            assertEquals("Simple Get should return \"test\"", "test", response.body());
+        }
+    }
+
+    // ===========================================================================
+
+    @Test
+    public void portTest() throws Exception {
+        try (Jark jark = Jark.ignite()) {
+            jark.port(10345)
+                .get("/test", (p, q) -> "test")
+                .start();
+
+            var request = HttpRequest.newBuilder()
+                    .GET()
+                    .uri(URI.create("http://localhost:10345/test"))
+                    .build();
+
+            var client = HttpClient
+                    .newBuilder()
+                    .connectTimeout(Duration.ofSeconds(5))
+                    .build();
+
             var response = client.send(request, HttpResponse.BodyHandlers.ofString());
             assertEquals("Simple Get should return \"test\"", "test", response.body());
         }

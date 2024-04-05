@@ -34,7 +34,7 @@ public class Jark implements Closeable, HttpHandler {
     protected SSLContext ssl = null;
 
     HttpServer server;
-    static Executor executor = Executors.newVirtualThreadPerTaskExecutor();
+    static Executor executor = null;
 
     List<JarkRoute> routes = new ArrayList<>();
 
@@ -44,7 +44,6 @@ public class Jark implements Closeable, HttpHandler {
 
     HttpContext context;
 
-
     String keystoreFile;
     String keystorePassword;
     String certAlias;
@@ -53,6 +52,10 @@ public class Jark implements Closeable, HttpHandler {
     boolean needsClientCert;
 
     public Jark staticFiles = this;
+
+    public boolean virtualThreads = true;
+
+    int poolSize = 1;
 
     // ===========================================================================
 
@@ -181,7 +184,7 @@ public class Jark implements Closeable, HttpHandler {
 
     // ===========================================================================
 
-    public void start() throws Exception {
+    public Jark start() throws Exception {
         if (ssl != null) {
             server = HttpsServer.create(new InetSocketAddress(ipAddress, port), -1);
             ((HttpsServer)server).setHttpsConfigurator(new HttpsConfigurator(ssl));
@@ -193,15 +196,18 @@ public class Jark implements Closeable, HttpHandler {
             basePath = basePath + "/";
         }
 
+        executor = virtualThreads ? Executors.newVirtualThreadPerTaskExecutor() : Executors.newCachedThreadPool();
+
         server.setExecutor(executor);
         context = server.createContext(basePath, this);
         server.start();
+        return this;
     }
 
     // ===========================================================================
 
-    public void init() throws Exception {
-        start();
+    public Jark init() throws Exception {
+        return start();
     }
 
     // ===========================================================================
@@ -470,8 +476,9 @@ public class Jark implements Closeable, HttpHandler {
         return port;
     }
 
-    public void port(int port) {
+    public Jark port(int port) {
         this.port = port;
+        return this;
     }
     public void setPort(int port) {
         this.port = port;
@@ -483,6 +490,11 @@ public class Jark implements Closeable, HttpHandler {
 
     public void setIpAddress(String ipAddress) {
         this.ipAddress = ipAddress;
+    }
+
+    public Jark ipAddress(String ipAddress) {
+        this.ipAddress = ipAddress;
+        return this;
     }
 
     public String getBasePath() {
@@ -501,8 +513,9 @@ public class Jark implements Closeable, HttpHandler {
         this.ssl = ssl;
     }
 
-    public void ssl(SSLContext ssl) {
+    public Jark ssl(SSLContext ssl) {
         this.ssl = ssl;
+        return this;
     }
 
     /**
@@ -511,20 +524,24 @@ public class Jark implements Closeable, HttpHandler {
      * <br/>In the words of SJ: A file /public/css/style.css is made available as http://{host}:{port}/css/style.css
      * @param location
      */
-    public void location(String location) {
+    public Jark location(String location) {
         routes.add(new JarkStaticContent(HttpMethod.GET, "/", null, location));
+        return this;
     }
 
-    public void location(String location, String urlPath) {
+    public Jark location(String location, String urlPath) {
         routes.add(new JarkStaticContent(HttpMethod.GET, urlPath, null, location));
+        return this;
     }
 
-    public void externalLocation(String location) {
+    public Jark externalLocation(String location) {
         routes.add(new JarkStaticContent(HttpMethod.GET, "/", null, location));
+        return this;
     }
 
-    public void externalLocation(String location, String urlPath) {
+    public Jark externalLocation(String location, String urlPath) {
         routes.add(new JarkStaticContent(HttpMethod.GET, urlPath, null, location));
+        return this;
     }
 
     /**
@@ -656,11 +673,48 @@ public class Jark implements Closeable, HttpHandler {
     }
 
     /**
-     * Set thread pool size. This is ignored by Jark as it uses
+     * Set thread pool size. This is ignored by Jark when it uses
      * a virtual thread executor.
      * @param poolSize
      */
-    public void threadPool(int poolSize) {
-        // Ignored - uses virtual threads
+    public Jark threadPool(int poolSize) {
+        this.poolSize = poolSize;
+        return this;
+    }
+
+    /**
+     * Set thread pool size. This is ignored by Jark when it uses
+     * a virtual thread executor.
+     * @param poolSize
+     */
+    public Jark poolSize(int poolSize) {
+        this.poolSize = poolSize;
+        return this;
+    }
+
+    public int getPoolSize() {
+        return poolSize;
+    }
+
+    /**
+     * Set thread pool size. This is ignored by Jark when it uses
+     * a virtual thread executor.
+     * @param poolSize
+     */
+    public void setPoolSize(int poolSize) {
+        this.poolSize = poolSize;
+    }
+
+    public boolean isVirtualThreads() {
+        return virtualThreads;
+    }
+
+    public void setVirtualThreads(boolean virtualThreads) {
+        this.virtualThreads = virtualThreads;
+    }
+
+    public Jark virtualThreads(boolean virtualThreads) {
+        this.virtualThreads = virtualThreads;
+        return this;
     }
 }
