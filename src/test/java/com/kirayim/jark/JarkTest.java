@@ -9,13 +9,11 @@ import javax.net.ssl.X509ExtendedTrustManager;
 import static org.junit.Assert.*;
 
 import java.io.*;
-import java.net.Authenticator;
-import java.net.Socket;
-import java.net.URI;
-import java.net.URL;
+import java.net.*;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
@@ -185,6 +183,27 @@ public class JarkTest {
             assertEquals("Simple Get should return \"test\"", "test", response.body());
         }
     }
+
+
+    // ===========================================================================
+    @Test
+    public void pathParamTest() throws Exception {
+        try (Jark jark = Jark.ignite()) {
+            jark.get("/test/:whoami/hello", (p, q) -> "Hello " + p.params("whoami"));
+            jark.start();
+
+            var request = HttpRequest.newBuilder()
+                    .GET()
+                    .uri(new URI("http://localhost:4567/test/" + URLEncoder.encode("Fred and Mike", StandardCharsets.UTF_8) + "/hello"))
+                    .build();
+
+            var client = HttpClient.newHttpClient();
+
+            var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            assertEquals("Should return result with names", "Hello Fred and Mike", response.body());
+        }
+    }
+
 
     // ===========================================================================
 

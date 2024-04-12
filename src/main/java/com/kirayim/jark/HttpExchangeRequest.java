@@ -3,9 +3,10 @@ package com.kirayim.jark;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.net.URI;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+import java.util.regex.Pattern;
 
 public class HttpExchangeRequest implements Request {
     HttpExchange exchange;
@@ -19,11 +20,17 @@ public class HttpExchangeRequest implements Request {
     String stringBody;
 
     byte[] rawBody;
+    String[] pathItems;
 
     boolean gotBody = false;
     boolean gotQuery = false;
+    boolean gotPath = false;
+
+    JarkRoute route;
 
     Map<String, String> queryItems = new HashMap<>();
+
+    // ===========================================================================
 
     public HttpExchangeRequest(HttpExchange exchange, String basePath) {
         this.exchange = exchange;
@@ -55,6 +62,8 @@ public class HttpExchangeRequest implements Request {
 
     public synchronized void checkQuery() {
         if (gotQuery == false) {
+            gotQuery = true;
+
             URI uri = exchange.getRequestURI();
             String query = uri.getQuery();
 
@@ -77,6 +86,24 @@ public class HttpExchangeRequest implements Request {
 
     // ===========================================================================
 
+    public synchronized void checkPath() {
+        if (gotPath == false) {
+            gotPath = true;
+
+            pathItems = path.split("/");
+        }
+    }
+
+    // ===========================================================================
+
+
+    protected JarkRoute getRoute() {
+        return route;
+    }
+
+    protected void setRoute(JarkRoute route) {
+        this.route = route;
+    }
 
     @Override
     public String body() {
@@ -243,9 +270,30 @@ public class HttpExchangeRequest implements Request {
         return queryMap().get(key);
     }
 
+    /** value of foo path parameter
+     *
+     * @param param
+     * @return
+     */
+    public String params(String param) {
+        checkPath();
+
+        if (route.pathParameters.containsKey(param)) {
+            int index = route.pathParameters.get(param);
+
+            if (pathItems.length > index) {
+                return URLDecoder.decode(pathItems[index], StandardCharsets.UTF_8);
+            }
+        }
+
+        return null;
+    }
+
+    // ===========================================================================
+
+
 //contextPath();            // the context path, e.g. "/hello"
 //cookies();                // request cookies sent by the client
-//params("foo");            // value of foo path parameter
 //params();                 // map with all parameters
 //pathInfo();               // the path info
 //protocol();               // the protocol, e.g. HTTP/1.1
@@ -253,7 +301,6 @@ public class HttpExchangeRequest implements Request {
 //queryMap("foo");          // query map for a certain parameter
 //queryParams();            // the query param list
 //queryParams("FOO");       // value of FOO query param
-//queryParamsValues("FOO")  // all values of FOO query param
 //requestMethod();          // The HTTP method (GET, ..etc)
 //scheme();                 // "http"
 //servletPath();            // the servlet path, e.g. /result.jsp

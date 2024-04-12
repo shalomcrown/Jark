@@ -1,6 +1,7 @@
 package com.kirayim.jark;
 
-import java.util.Objects;
+import java.util.*;
+import java.util.regex.Pattern;
 
 public class JarkRoute {
     HttpMethod httpMethod;
@@ -8,11 +9,42 @@ public class JarkRoute {
     String acceptType;
     Object target;
 
+    Pattern pathPattern;
+    Map<String, Integer> pathParameters = new HashMap<>();
+
+    boolean hasPathParameters = false;
+
     public JarkRoute(HttpMethod httpMethod, String path, String acceptType, Object target) {
         this.httpMethod = httpMethod;
         this.path = path;
         this.acceptType = acceptType;
         this.target = target;
+
+
+        ListIterator<String> it = Arrays.asList(path.split("/")).listIterator();
+        StringBuffer pathBuffer = new StringBuffer();
+
+        while (it.hasNext()) {
+            int index = it.nextIndex();
+            String pathItem = it.next();
+
+            if (pathItem != null && pathItem.length() > 0 && pathItem.startsWith(":")) {
+                pathParameters.put(pathItem.substring(1), 1);
+                pathBuffer.append("[^/]*");
+                hasPathParameters = true;
+            } else {
+                pathBuffer.append(pathItem);
+            }
+
+            if (it.hasNext()) {
+                pathBuffer.append("/");
+            }
+        }
+
+        if (hasPathParameters) {
+            pathPattern = Pattern.compile(pathBuffer.toString(), Pattern.CASE_INSENSITIVE);
+        }
+
     }
 
     @Override

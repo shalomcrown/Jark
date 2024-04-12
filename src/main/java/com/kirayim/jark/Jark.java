@@ -15,6 +15,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.regex.Matcher;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -315,6 +316,7 @@ public class Jark implements Closeable, HttpHandler {
                 .filter(p -> p.getPath() == null
                         || request.path().startsWith(p.getPath())
                         || pathWithleadingSlash.startsWith(p.getPath())
+                        || (p.hasPathParameters &&  p.pathPattern.matcher(request.path).find())
                 )
                 .filter(p -> p.getHttpMethod() == null || p.getHttpMethod() == request.method)
                 .filter(p -> (request.acceptTypes == null
@@ -390,6 +392,8 @@ public class Jark implements Closeable, HttpHandler {
         }
 
         for (var route: filteredRoutes)  {
+            request.setRoute(route);
+
             try {
                 switch (route) {
                     case JarkStaticContent f ->  handleStaticContent(f, exchange, request, response);

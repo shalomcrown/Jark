@@ -59,16 +59,21 @@ public interface Request {
     String requestMethod(); // The HTTP method (GET, ..etc)
 
     String contentType();            // content type of request.body
+
+    String params(String param);            // value of foo path parameter
+
+    String queryParamsValues(String key);
+
+    Map<String, String> queryMap();               // the query map
+    Map<String, String> queryMap(String item);          // query map for a certain parameter
+
+
 //contextPath();            // the context path, e.g. "/hello"
 //cookies();                // request cookies sent by the client
-//params("foo");            // value of foo path parameter
 //params();                 // map with all parameters
 //pathInfo();               // the path info
-//queryMap();               // the query map
-//queryMap("foo");          // query map for a certain parameter
 //queryParams();            // the query param list
 //queryParams("FOO");       // value of FOO query param
-//queryParamsValues("FOO")  // all values of FOO query param
 //servletPath();            // the servlet path, e.g. /result.jsp
 //session();                // session management
 //splat();                  // splat (*) parameters
