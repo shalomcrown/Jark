@@ -28,7 +28,7 @@
 
   <scm>
     <connection>scm:git:git@github.com:org/Jark.git</connection>
-    <developerConnection>scm:git:git@github.com:org/Jark.git</developerConnection>
+    <developerConnection>scm:git:git@github.com:shalomcrown/Jark.git</developerConnection>
     <url>https://github.com/shalomcrown/Jark.git</url>
     <tag>Jark-0.2</tag>
   </scm>
