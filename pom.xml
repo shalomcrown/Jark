@@ -52,23 +52,37 @@
       </plugin>
 
 
+<!--      <plugin>-->
+<!--        <groupId>org.sonatype.plugins</groupId>-->
+<!--        <artifactId>nexus-staging-maven-plugin</artifactId>-->
+<!--        <version>1.6.13</version>-->
+<!--        <executions>-->
+<!--          <execution>-->
+<!--            <id>default-deploy</id>-->
+<!--            <phase>deploy</phase>-->
+<!--            <goals>-->
+<!--              <goal>deploy</goal>-->
+<!--            </goals>-->
+<!--          </execution>-->
+<!--        </executions>-->
+<!--        <configuration>-->
+<!--          <serverId>sonatype-oss</serverId>-->
+<!--          <nexusUrl>https://s01.oss.sonatype.org</nexusUrl>-->
+<!--          <skipStaging>true</skipStaging>-->
+<!--        </configuration>-->
+<!--      </plugin>-->
+
+
       <plugin>
         <groupId>org.sonatype.plugins</groupId>
         <artifactId>nexus-staging-maven-plugin</artifactId>
         <version>1.6.13</version>
-        <executions>
-          <execution>
-            <id>default-deploy</id>
-            <phase>deploy</phase>
-            <goals>
-              <goal>deploy</goal>
-            </goals>
-          </execution>
-        </executions>
+        <extensions>true</extensions>
         <configuration>
           <serverId>sonatype-oss</serverId>
-          <nexusUrl>https://s01.oss.sonatype.org</nexusUrl>
-          <skipStaging>true</skipStaging>
+          <nexusUrl>https://s01.oss.sonatype.org/</nexusUrl>
+          <autoReleaseAfterClose>true</autoReleaseAfterClose>
+          <stagingProgressTimeoutMinutes>60</stagingProgressTimeoutMinutes>
         </configuration>
       </plugin>
     </plugins>
@@ -94,10 +108,7 @@
             <artifactId>maven-gpg-plugin</artifactId>
             <version>3.2.2</version>
             <configuration>
-              <gpgArguments>
-                <arg>--pinentry-mode</arg>
-                <arg>loopback</arg>
-              </gpgArguments>
+              <keyname>0xD200EA3C</keyname>
             </configuration>
             <executions>
               <execution>
@@ -150,19 +161,9 @@
               <localCheckout>true</localCheckout>
               <remoteTagging>false</remoteTagging>
               <arguments>-DskipTests=true</arguments>
-            </configuration>
-          </plugin>
-
-          <plugin>
-            <groupId>org.sonatype.plugins</groupId>
-            <artifactId>nexus-staging-maven-plugin</artifactId>
-            <version>1.6.13</version>
-            <extensions>true</extensions>
-            <configuration>
-              <serverId>ossrh</serverId>
-              <nexusUrl>https://s01.oss.sonatype.org/</nexusUrl>
-              <autoReleaseAfterClose>true</autoReleaseAfterClose>
-              <stagingProgressTimeoutMinutes>60</stagingProgressTimeoutMinutes>
+              <useReleaseProfile>false</useReleaseProfile>
+              <releaseProfiles>release</releaseProfiles>
+              <goals>deploy</goals>
             </configuration>
           </plugin>
 
@@ -193,7 +194,8 @@
 <!--    </repository>-->
 
     <snapshotRepository>
-      <id>ossrh</id>
+      <id>sonatype-oss</id>
+      <name>SOntype Nexus Snapshots</name>
       <url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
     </snapshotRepository>
 
