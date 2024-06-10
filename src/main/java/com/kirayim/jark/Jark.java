@@ -7,17 +7,13 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
 import java.io.*;
 import java.net.InetSocketAddress;
-import java.nio.file.Path;
 import java.security.KeyStore;
 import java.security.SecureRandom;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
-import java.util.regex.Matcher;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * Hello world!
@@ -321,7 +317,8 @@ public class Jark implements Closeable, HttpHandler {
                 .filter(p -> p.getHttpMethod() == null || p.getHttpMethod() == request.method)
                 .filter(p -> (request.acceptTypes == null
                         || request.acceptTypes.isEmpty()
-                        || request.acceptTypes.stream().anyMatch(q -> p != null && p.getAcceptType().equals(q))))
+                        || request.acceptTypes.stream().anyMatch(q -> p != null
+                            && (p.getAcceptType() == null  || p.getAcceptType().equals(q)))))
                 .collect(Collectors.toList());
     }
 
@@ -369,86 +366,92 @@ public class Jark implements Closeable, HttpHandler {
     // ==============================================================================
 
     public void handle(HttpExchange exchange) throws IOException {
+        try {
+            HttpExchangeRequest request = new HttpExchangeRequest(exchange, basePath);
+            Response response = new HttpExchangeResponse(exchange);
 
-        HttpExchangeRequest request = new HttpExchangeRequest(exchange, basePath);
-        Response response = new HttpExchangeResponse(exchange);
+            if (executeFilters(request, response, beforeFilters) == false) {
+                return;
+            }
 
-        if (executeFilters(request, response, beforeFilters) == false) {
-            return;
-        }
+            List<Object> results = new ArrayList<>();
+            List<byte[]> binaryResults = new ArrayList<>();
 
-        List<Object> results = new ArrayList<>();
-        List<byte[]> binaryResults = new ArrayList<>();
+            List<JarkRoute> filteredRoutes = filterRoutes(request, routes);
 
-        List<JarkRoute> filteredRoutes = filterRoutes(request, routes);
+            if (filteredRoutes == null | filteredRoutes.isEmpty()) {
+                String message = "Path not found";
 
-        if (filteredRoutes == null | filteredRoutes.isEmpty()) {
-            String message = "Path not found";
+                exchange.sendResponseHeaders(404, message.getBytes().length);
+                exchange.getResponseBody().write(message.getBytes());
+                exchange.close();
+                return;
+            }
 
-            exchange.sendResponseHeaders(404, message.getBytes().length);
-            exchange.getResponseBody().write(message.getBytes());
-            exchange.close();
-            return;
-        }
+            for (var route : filteredRoutes) {
+                request.setRoute(route);
 
-        for (var route: filteredRoutes)  {
-            request.setRoute(route);
-
-            try {
-                switch (route) {
-                    case JarkStaticContent f ->  handleStaticContent(f, exchange, request, response);
-                    case JarkRoute j -> {
-                        switch (j.getTarget()) {
-                            case null -> { }
-                            case JarkFilter f -> f.handle(request, response);
-                            case Route f -> {
-                                results.add(f.handle(request, response));
-                                if (response.body() != null) {
-                                    binaryResults.add(response.body());
+                try {
+                    switch (route) {
+                        case JarkStaticContent f -> handleStaticContent(f, exchange, request, response);
+                        case JarkRoute j -> {
+                            switch (j.getTarget()) {
+                                case null -> {
                                 }
+                                case JarkFilter f -> f.handle(request, response);
+                                case Route f -> {
+                                    results.add(f.handle(request, response));
+                                    if (response.body() != null) {
+                                        binaryResults.add(response.body());
+                                    }
+                                }
+                                default -> throw new Exception("No target for route");
                             }
-                            default -> throw new Exception("No target for route");
+                        }
+                    }
+
+                } catch (Exception e) {
+                    handleException(request.exchange, e);
+                    return;
+                }
+            }
+            ;
+
+            if (executeFilters(request, response, afterFilters) == false) {
+                return;
+            }
+
+            if (exchange.getResponseCode() == -1) {
+                int byteCount = 0;
+                ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+                String stringData;
+
+                if (results.isEmpty() == false) {
+                    for (Object result : results) {
+                        switch (result) {
+                            case null -> {
+                            }
+                            case String s -> bytes.write(s.getBytes());
+                            default -> bytes.write(result.toString().getBytes());
                         }
                     }
                 }
 
-            } catch (Exception e) {
-                handleException(request.exchange, e);
-                return;
-            }
-        };
-
-        if (executeFilters(request, response, afterFilters) == false) {
-            return;
-        }
-
-        if (exchange.getResponseCode() == -1) {
-            int byteCount = 0;
-            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-            String stringData;
-
-            if (results.isEmpty() == false) {
-                for (Object result : results) {
-                    switch (result) {
-                        case null -> {}
-                        case String s -> bytes.write(s.getBytes());
-                        default -> bytes.write(result.toString().getBytes());
+                if (binaryResults.isEmpty() == false) {
+                    for (byte[] result : binaryResults) {
+                        if (result != null) {
+                            bytes.write(result);
+                        }
                     }
                 }
+
+                byteCount += bytes.size();
+
+                exchange.sendResponseHeaders(response.getStatus(), byteCount);
+                exchange.getResponseBody().write(bytes.toByteArray());
             }
-
-            if (binaryResults.isEmpty() == false) {
-                for (byte[] result : binaryResults) {
-                    if (result != null) {
-                        bytes.write(result);
-                    }
-                }
-            }
-
-            byteCount += bytes.size();
-
-            exchange.sendResponseHeaders(response.getStatus(), byteCount);
-            exchange.getResponseBody().write(bytes.toByteArray());
+        } catch (Exception e) {
+            e.printStackTrace();
         }
 
         exchange.close();
