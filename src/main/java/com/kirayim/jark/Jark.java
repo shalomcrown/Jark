@@ -415,7 +415,6 @@ public class Jark implements Closeable, HttpHandler {
                     return;
                 }
             }
-            ;
 
             if (executeFilters(request, response, afterFilters) == false) {
                 return;
