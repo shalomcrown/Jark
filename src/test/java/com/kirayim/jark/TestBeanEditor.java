@@ -25,8 +25,8 @@ public class TestBeanEditor {
 
         con.getResponseCode();
 
-        synchronized (beanUnderTest) {
-            beanUnderTest.wait();
-        }
+//        synchronized (beanUnderTest) {
+//            beanUnderTest.wait();
+//        }
     }
 }
