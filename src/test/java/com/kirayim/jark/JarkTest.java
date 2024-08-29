@@ -1,15 +1,16 @@
 package com.kirayim.jark;
+
 import org.junit.Test;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509ExtendedTrustManager;
-
-import static org.junit.Assert.*;
-
 import java.io.*;
-import java.net.*;
+import java.net.Socket;
+import java.net.URI;
+import java.net.URL;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -19,7 +20,8 @@ import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.Date;
-import java.util.stream.StreamSupport;
+
+import static org.junit.Assert.*;
 
 /**
  * Unit test for simple App.

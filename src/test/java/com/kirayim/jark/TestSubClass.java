@@ -1,4 +1,3 @@
-
 package com.kirayim.jark;
 
 import javax.annotation.processing.Generated;

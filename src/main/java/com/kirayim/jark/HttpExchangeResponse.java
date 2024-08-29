@@ -2,8 +2,6 @@ package com.kirayim.jark;
 
 import com.sun.net.httpserver.HttpExchange;
 
-import javax.swing.*;
-import java.util.Collections;
 import java.util.List;
 
 public class HttpExchangeResponse implements Response {

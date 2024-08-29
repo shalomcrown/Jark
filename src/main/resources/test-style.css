@@ -1,0 +1,32 @@
+body {
+    color: white;
+    background: black;
+}
+
+h1 {
+    color: #00a6ff;
+    font-size: 28px;
+    font-weight: 600;
+}
+
+h2 {
+    color: #00a6ff;
+    font-size: 22px;
+    font-weight: 100;
+}
+
+input[type="button"] {
+    background-color: #00a6ff;
+    border: 2px solid #113f59;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 400;
+    text-align: center;
+}
+
+table, th, td {
+    border: 1px solid #113f59;
+    background-color: #00a6ff;
+    border-collapse: collapse;
+}

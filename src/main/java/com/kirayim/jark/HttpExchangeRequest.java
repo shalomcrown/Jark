@@ -5,8 +5,9 @@ import com.sun.net.httpserver.HttpExchange;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
-import java.util.regex.Pattern;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class HttpExchangeRequest implements Request {
     HttpExchange exchange;

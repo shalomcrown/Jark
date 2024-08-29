@@ -3,19 +3,17 @@ package com.kirayim.jark.beans;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.text.StringEscapeUtils;
 
-import javax.swing.*;
-import java.awt.*;
 import java.beans.BeanInfo;
 import java.beans.Introspector;
 import java.beans.PropertyDescriptor;
 import java.io.File;
-import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.time.Duration;
 import java.time.temporal.Temporal;
-import java.util.*;
-import java.util.function.Consumer;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 
 public class BeanFormGenerator {
     Map<String, Object[]> elementMap = new HashMap<>();
@@ -81,7 +79,7 @@ public class BeanFormGenerator {
             html.append("</td><td>");
 
             String tag = parent + pdesc.getName();
-            Field field = beanBeingEdited.getClass().getDeclaredField(pdesc.getName());
+            Field field = BeanUtils.getField(beanBeingEdited, pdesc.getName());
             elementMap.put(tag, new Object[]{pdesc, beanBeingEdited});
 
             if (Boolean.class.isAssignableFrom(pdesc.getPropertyType())

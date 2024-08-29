@@ -5,13 +5,15 @@ import com.kirayim.jark.Request;
 import com.kirayim.jark.Response;
 import org.apache.commons.lang3.StringUtils;
 
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.util.function.Consumer;
 
 public class BeanEditor<T> {
 
     static String defaultPage = """
             <html>
+                <link rel="stylesheet" href="test-style.css"/>
             <body>
                 <h1>Base file for bean test</h1>
 
@@ -50,7 +52,6 @@ public class BeanEditor<T> {
         this.submitFunction = submitFunction;
         this.onUpdate = onUpdate;
 
-
         if (StringUtils.isBlank(baseResource)) {
             baseResource = "/";
         }
@@ -65,6 +66,7 @@ public class BeanEditor<T> {
 
         jark.get(baseResource, this::mainPage);
         jark.post(this.submitFunction, this::postForm);
+        jark.location("test-style.css", "test-style.css");
 
         formGenerator = new BeanFormGenerator();
 
