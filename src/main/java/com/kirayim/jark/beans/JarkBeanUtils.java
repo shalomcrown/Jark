@@ -3,7 +3,7 @@ package com.kirayim.jark.beans;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 
-public class BeanUtils {
+public class JarkBeanUtils {
 
     public static Field getField(Object obj, String name) {
         for (Class<?> clazz = obj.getClass(); clazz != null; clazz = clazz.getSuperclass()) {

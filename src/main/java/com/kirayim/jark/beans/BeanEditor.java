@@ -3,13 +3,16 @@ package com.kirayim.jark.beans;
 import com.kirayim.jark.Jark;
 import com.kirayim.jark.Request;
 import com.kirayim.jark.Response;
+import org.apache.commons.beanutils.BeanUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.ByteArrayInputStream;
+import java.io.Closeable;
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.function.Consumer;
 
-public class BeanEditor<T> {
+public class BeanEditor<T> implements Closeable {
 
     static String defaultPage = """
             <html>
@@ -17,9 +20,9 @@ public class BeanEditor<T> {
             <body>
                 <h1>Base file for bean test</h1>
 
-                <form>
+                <form name="beanform" action="/submitBean" method="post" >
                     INPUT_HERE
-                    <input type="submit" formaction="/submitBean">
+                     <input type="submit" value="Submit"/>
                 </form>
             </body>
             </html>
@@ -76,6 +79,10 @@ public class BeanEditor<T> {
         this(null, bean, null, null, null, null, onUpdate);
     }
 
+    public BeanEditor (T bean) throws Exception {
+        this(null, bean, null, null, null, null, null);
+    }
+
     // =============================================================================
 
     public String mainPage(Request request, Response response) throws Exception {
@@ -109,6 +116,31 @@ public class BeanEditor<T> {
 
     public String postForm(Request request, Response response) throws Exception {
 
+        String body = request.body();
+
+        if (StringUtils.isNoneBlank(body)) {
+            String[] items = StringUtils.split(body, "&");
+
+            for (String item : items) {
+                if (StringUtils.isNotBlank(item)) {
+                    item = item.trim();
+                    String[] parts = item.split("=");
+
+                    if (parts.length >= 2) {
+                        BeanFormItemInfo info = formGenerator.elementMap.get(parts[0]);
+
+                        if (info != null) {
+                            if (info.updater == null) {
+                                BeanUtils.setProperty(info.bean, info.pdesc.getName(), parts[1]);
+                            }
+                        } else {
+                            // TODO:
+                        }
+
+                    }
+                }
+            }
+        }
 
         if (onUpdate != null) {
             onUpdate.accept(bean);
@@ -117,4 +149,12 @@ public class BeanEditor<T> {
         return null;
     }
 
+    //=============================================================================================
+
+    @Override
+    public void close() throws IOException {
+        if (ownJark && jark != null) {
+            jark.close();
+        }
+    }
 }

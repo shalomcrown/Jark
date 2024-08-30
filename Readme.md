@@ -13,6 +13,8 @@ that use Spark Java for simple REST interfaces, and it's difficult and wasteful 
 Since it is intended to replace Spark Java, it borrows as much of the concepts and interfaces 
 as possible, so moving to it will be easy.
 
+Now adding a system for generating and using web pages to edit Java beans/pojos.
+
 # How to use it
 ```java
         Jark jark = Jark.ignite();
@@ -49,10 +51,38 @@ implementation This allows them to be matched as specified.
 Since there are no dependencies, it is impossible to include a library like Jackson to convert objects 
 to JSON before returning them (or accepting them)
 
+**Updated - Bean editing**: The Apache commons bean utils and commons text are added as
+dependencies, which shouldn't bother anyone. But still no Jackson...
+
 Also URL path parameters aren't implemented, though that should be easy and nice, provided they can be
 given as strings.
 
-## Implementation status
+# Bean editor
+In its simplest form, you can create a bean editor with default web page on port 8085
+by simply
+
+```java
+  var editor = new BeanEditor(myObject);
+```
+
+When the user submits the form, the fields of the bean are automatically updated with
+the new values.
+
+However, constructors are available with which you can supply a function to be called when
+the bean is updated, and your own web page, with a tag to be replaced by the bean 
+editing HTML, this would usually be in a form, because then the browser collects all
+the data easily.
+
+It works by generating the content of a form, giving each item an ID which is a dotted
+path through the membership tree.
+
+On form submission, the values are updated in the bean.
+
+Arrays, collections, Temporals etc. are not yet imeplemented, and we'll need a way
+of specifying custom serializers for things like _javax.quantity_.
+
+
+# Implementation status
 * Basic operations work
 * Filters aren't tested very well
 * SSL works (use `secure()` function), though not tested with keystore as resource.

@@ -3,9 +3,13 @@ package com.kirayim.jark;
 import javax.annotation.processing.Generated;
 
 public class TestSubClass {
+
+	enum TestTypes {NONE, ALL, RANDOM, SMILEY};
+
 	private int subItemNumber = 34;
 	private Double subItemEmptyDouble = null;
 	private Double subItemDouble = 345.33;
+	TestTypes testType = TestTypes.ALL;
 
 	public TestSubClass() {
 	}
@@ -91,6 +95,15 @@ public class TestSubClass {
 	public void setSubItemDouble(Double subItemDouble) {
 		this.subItemDouble = subItemDouble;
 	}
+
+	public TestTypes getTestType() {
+		return testType;
+	}
+
+	public void setTestType(TestTypes testType) {
+		this.testType = testType;
+	}
+
 	/**
 	 * Creates builder to build {@link TestSubClass}.
 	 * @return created builder

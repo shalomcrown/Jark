@@ -8,6 +8,7 @@ import java.beans.Introspector;
 import java.beans.PropertyDescriptor;
 import java.io.File;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.time.temporal.Temporal;
 import java.util.Arrays;
@@ -16,7 +17,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class BeanFormGenerator {
-    Map<String, Object[]> elementMap = new HashMap<>();
+
+
+    Map<String, BeanFormItemInfo> elementMap = new HashMap<>();
 
     // ===========================================================================
 
@@ -25,6 +28,50 @@ public class BeanFormGenerator {
                             StringUtils.capitalize(StringUtils.join(StringUtils.splitByCharacterTypeCamelCase(original), ' ')), 35);
     }
 
+    //=============================================================================================
+
+    private static void htmlCheckbox(Object beanBeingEdited, PropertyDescriptor pdesc, StringBuilder html, String tag) throws Exception {
+        html.append("<input type=\"checkbox\" checked=");
+        html.append(pdesc.getReadMethod().invoke(beanBeingEdited));
+        html.append(" name=\"").append(tag).append("\"");
+        html.append(" id=\"").append(pdesc.getDisplayName()).append("\"");
+        html.append("/>");
+    }
+
+    //=============================================================================================
+
+    private static void htmlValueEdit(Object beanBeingEdited, PropertyDescriptor pdesc, StringBuilder html, String tag) throws IllegalAccessException, InvocationTargetException {
+        html.append("<input type=\"text\"");
+        Object value = pdesc.getReadMethod().invoke(beanBeingEdited);
+
+        if (value != null) {
+            html.append(" value=");
+            html.append(StringEscapeUtils.escapeHtml4(value.toString()));
+        }
+
+        html.append(" name=\"").append(tag).append("\"");
+        html.append(" id=\"").append(pdesc.getDisplayName()).append("\"");
+        html.append("/>");
+    }
+
+    //=============================================================================================
+
+    private static void htmlEnumEditor(PropertyDescriptor pdesc, StringBuilder html, String tag, Object value) {
+        html.append("<select name=\"").append(tag).append("\"");
+        html.append(" id=\"").append(pdesc.getDisplayName()).append("\"");
+        html.append(">\n");
+
+        for (Object item : pdesc.getPropertyType().getEnumConstants()) {
+            html.append("<option value=\"").append(item).append("\"");
+            if (item == value) {
+                html.append(" selected=\"true\"");
+            }
+            html.append(">");
+            html.append(item.toString());
+            html.append("</option>");
+        }
+        html.append("</select>");
+    }
 
     // ===========================================================================
 
@@ -32,8 +79,9 @@ public class BeanFormGenerator {
         return generateBeanHtml(beanBeingEdited, null);
     }
 
+    //=============================================================================================
 
-    public String generateBeanHtml(Object beanBeingEdited, String parent) throws Exception{
+    public String generateBeanHtml(Object beanBeingEdited, String parent) throws Exception {
         StringBuilder html = new StringBuilder();
 
         if (beanBeingEdited.getClass().isArray() || Collection.class.isAssignableFrom(beanBeingEdited.getClass())) {
@@ -79,23 +127,23 @@ public class BeanFormGenerator {
             html.append("</td><td>");
 
             String tag = parent + pdesc.getName();
-            Field field = BeanUtils.getField(beanBeingEdited, pdesc.getName());
-            elementMap.put(tag, new Object[]{pdesc, beanBeingEdited});
+            Field field = JarkBeanUtils.getField(beanBeingEdited, pdesc.getName());
+
+            BeanFormItemInfo formItemInfo = new BeanFormItemInfo(tag, pdesc, beanBeingEdited);
+
+            elementMap.put(tag, formItemInfo);
 
             if (Boolean.class.isAssignableFrom(pdesc.getPropertyType())
                             || pdesc.getPropertyType().equals(boolean.class)
                             || pdesc.getPropertyType().equals(Boolean.class)) {
 
-                    html.append("<input type=\"checkbox\" checked=");
-                    html.append(pdesc.getReadMethod().invoke(beanBeingEdited));
-                    html.append(" name=\"").append(tag).append("\"");
-                    html.append("/>");
+                htmlCheckbox(beanBeingEdited, pdesc, html, tag);
 
 
             } else if (File.class.isAssignableFrom(pdesc.getPropertyType())
                             || field.isAnnotationPresent(ModelAnnotations.FileName.class)
                             || field.isAnnotationPresent(ModelAnnotations.FolderName.class)) {
-                html.append("Type not implemented");
+                htmlValueEdit(beanBeingEdited, pdesc, html, tag);
 
                     // TODO
 //				editorComponent = GuiUtils.getFileItemPanel(beanBeingEdited, pdesc.getName());
@@ -104,15 +152,12 @@ public class BeanFormGenerator {
                             || pdesc.getPropertyType().isAssignableFrom(String.class)
                             || Number.class.isAssignableFrom(pdesc.getPropertyType())) {
 
-                    html.append("<input type=\"text\" value=");
-                    html.append(StringEscapeUtils.escapeHtml4(pdesc.getReadMethod().invoke(beanBeingEdited).toString()));
-                    html.append(" name=\"").append(tag).append("\"");
-                    html.append("/>");
+                htmlValueEdit(beanBeingEdited, pdesc, html, tag);
 
-            } else if (Enum.class.isAssignableFrom(pdesc.getPropertyType())) {
-//				editorComponent = GuiUtils.getEnumComboBox(beanBeingEdited, pdesc.getName(),
-//						(Class<? extends Enum<?>>) pdesc.getPropertyType());
-                html.append("Type not implemented");
+            } else if (Enum.class.isAssignableFrom(pdesc.getPropertyType()) || pdesc.getPropertyType().isEnum()) {
+                Object value = pdesc.getReadMethod().invoke(beanBeingEdited);
+
+                htmlEnumEditor(pdesc, html, tag, value);
 
             } else if (pdesc.getPropertyType().isArray()) {
                    // TODO:
