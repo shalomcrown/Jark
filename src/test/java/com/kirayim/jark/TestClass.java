@@ -3,6 +3,8 @@ package com.kirayim.jark;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Date;
+import java.util.Objects;
 
 
 public class TestClass {
@@ -12,6 +14,7 @@ public class TestClass {
 	private double notTheAnswer = 55.6;
 	private Duration howLong = Duration.ofSeconds(3745);
 	private Instant when = Instant.now();
+	private Date joesBirthday = new Date();
 	private TestSubClass sub = new TestSubClass();
 //	private ArrayList<TestSubClass> listItems; // = Collections.(new TestSubClass(),
 ////			TestSubClass.builder().withSubItemDouble(44.45745).withSubItemEmptyDouble(12409.124).build());
@@ -64,64 +67,29 @@ public class TestClass {
 	public void setNotTheAnswer(double notTheAnswer) {
 		this.notTheAnswer = notTheAnswer;
 	}
+
+
+	public Date getJoesBirthday() {
+		return joesBirthday;
+	}
+
+	public void setJoesBirthday(Date joesBirthday) {
+		this.joesBirthday = joesBirthday;
+	}
+
+	@Override
+	public boolean equals(Object o) {
+		if (this == o) return true;
+		if (o == null || getClass() != o.getClass()) return false;
+		TestClass testClass = (TestClass) o;
+		return valid == testClass.valid && theAswer == testClass.theAswer && Double.compare(notTheAnswer, testClass.notTheAnswer) == 0 && Objects.equals(name, testClass.name) && Objects.equals(howLong, testClass.howLong) && Objects.equals(when, testClass.when) && Objects.equals(joesBirthday, testClass.joesBirthday) && Objects.equals(sub, testClass.sub);
+	}
+
 	@Override
 	public int hashCode() {
-		final int prime = 31;
-		int result = 1;
-		result = prime * result + ((howLong == null) ? 0 : howLong.hashCode());
-//		result = prime * result + ((listItems == null) ? 0 : listItems.hashCode());
-		result = prime * result + ((name == null) ? 0 : name.hashCode());
-		long temp;
-		temp = Double.doubleToLongBits(notTheAnswer);
-		result = prime * result + (int) (temp ^ (temp >>> 32));
-		result = prime * result + ((sub == null) ? 0 : sub.hashCode());
-		result = prime * result + theAswer;
-		result = prime * result + (valid ? 1231 : 1237);
-		result = prime * result + ((when == null) ? 0 : when.hashCode());
-		return result;
+		return Objects.hash(valid, name, theAswer, notTheAnswer, howLong, when, joesBirthday, sub);
 	}
-	@Override
-	public boolean equals(Object obj) {
-		if (this == obj)
-			return true;
-		if (obj == null)
-			return false;
-		if (getClass() != obj.getClass())
-			return false;
-		TestClass other = (TestClass) obj;
-		if (howLong == null) {
-			if (other.howLong != null)
-				return false;
-		} else if (!howLong.equals(other.howLong))
-			return false;
-//		if (listItems == null) {
-//			if (other.listItems != null)
-//				return false;
-//		} else if (! Collections.isEqualCollection(listItems, other.listItems))
-//			return false;
-		if (name == null) {
-			if (other.name != null)
-				return false;
-		} else if (!name.equals(other.name))
-			return false;
-		if (Double.doubleToLongBits(notTheAnswer) != Double.doubleToLongBits(other.notTheAnswer))
-			return false;
-		if (sub == null) {
-			if (other.sub != null)
-				return false;
-		} else if (!sub.equals(other.sub))
-			return false;
-		if (theAswer != other.theAswer)
-			return false;
-		if (valid != other.valid)
-			return false;
-		if (when == null) {
-			if (other.when != null)
-				return false;
-		} else if (!when.equals(other.when))
-			return false;
-		return true;
-	}
+
 	/**
 	 * @return the howLong
 	 */
@@ -176,6 +144,9 @@ public class TestClass {
 	/**
 	 * @return the listItems
 	 */
+
+
+
 //	public ArrayList<TestSubClass> getListItems() {
 //		return listItems;
 //	}

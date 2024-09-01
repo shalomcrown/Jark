@@ -10,6 +10,8 @@ import java.io.ByteArrayInputStream;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.function.Consumer;
 
 public class BeanEditor<T> implements Closeable {
@@ -23,6 +25,7 @@ public class BeanEditor<T> implements Closeable {
                 <form name="beanform" action="/submitBean" method="post" >
                     INPUT_HERE
                      <input type="submit" value="Submit"/>
+                      <input type="reset" value="Reset"  align="right"/>
                 </form>
             </body>
             </html>
@@ -118,6 +121,7 @@ public class BeanEditor<T> implements Closeable {
         String body = request.body();
 
         if (StringUtils.isNoneBlank(body)) {
+            Map<String, String> bodyMap = new HashMap<>();
             String[] items = StringUtils.split(body, "&");
 
             for (String item : items) {
@@ -126,22 +130,24 @@ public class BeanEditor<T> implements Closeable {
                     String[] parts = item.split("=");
 
                     if (parts.length >= 2) {
-                        BeanFormItemInfo info = formGenerator.elementMap.get(parts[0]);
-
-                        if (info != null) {
-                            if (info.updater == null) {
-                                BeanUtils.setProperty(info.bean, info.pdesc.getName(), parts[1]);
-                            } else {
-                                info.updater.accept(info, parts[1]);
-                            }
-                        } else {
-                            // TODO:
-                        }
-
-                    } else if (parts.length == 1) {
-                        BeanFormItemInfo info = formGenerator.elementMap.get(parts[0]);
-                        BeanUtils.setProperty(info.bean, info.pdesc.getName(), null);
+                        bodyMap.put(parts[0], parts[1]);
+                    } else {
+                        bodyMap.put(parts[0], null);
                     }
+                }
+            }
+
+            for (Map.Entry<String, String> entry : bodyMap.entrySet()) {
+                BeanFormItemInfo info = formGenerator.elementMap.get(entry.getKey());
+
+                if (info != null) {
+                    if (info.updater == null) {
+                        BeanUtils.setProperty(info.bean, info.pdesc.getName(), bodyMap.get(entry.getKey()));
+                    } else {
+                        info.updater.accept(info, bodyMap);
+                    }
+                } else {
+                    // TODO:
                 }
             }
         }

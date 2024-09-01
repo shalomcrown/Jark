@@ -5,23 +5,16 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.Assert.*;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
-import org.openqa.selenium.remote.DesiredCapabilities;
-import org.openqa.selenium.remote.RemoteWebDriver;
 import org.openqa.selenium.support.ui.Select;
-
-import java.net.HttpURLConnection;
-import java.net.URI;
-import java.net.URL;
 
 public class TestBeanEditor {
 
     private WebDriver driver;
-    BeanEditor beanEditor;
+    BeanEditor<?> beanEditor;
     DerivedTestClass beanUnderTest;
 
     @Before
@@ -35,7 +28,7 @@ public class TestBeanEditor {
 
         beanUnderTest = new DerivedTestClass();
 
-        beanEditor = new BeanEditor(beanUnderTest, p -> {
+        beanEditor = new BeanEditor<>(beanUnderTest, p -> {
             synchronized(beanUnderTest) {
                 beanUnderTest.notify();
             }
@@ -74,13 +67,13 @@ public class TestBeanEditor {
 
     /**
      * If you want to run the web page
-     * @param args
-     * @throws Exception
+     * @param args Main args
+     * @throws Exception on something
      */
     public static void main(String[] args) throws Exception {
         var beanUnderTest = new DerivedTestClass();
 
-        var beanEditor = new BeanEditor(beanUnderTest, p -> {
+        new BeanEditor<>(beanUnderTest, p -> {
             synchronized(beanUnderTest) {
                 beanUnderTest.notify();
             }

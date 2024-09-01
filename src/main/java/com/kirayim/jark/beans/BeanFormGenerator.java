@@ -2,8 +2,6 @@ package com.kirayim.jark.beans;
 
 import org.apache.commons.beanutils.BeanUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.commons.text.StringEscapeUtils;
 
 import java.beans.BeanInfo;
@@ -13,16 +11,21 @@ import java.io.File;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.Temporal;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
+import java.time.temporal.TemporalAccessor;
+import java.util.*;
 
 public class BeanFormGenerator {
 
 
     Map<String, BeanFormItemInfo> elementMap = new HashMap<>();
+
+    public final static DateTimeFormatter standardFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSZ").withZone(ZoneId.systemDefault());
+    public final static DateTimeFormatter noTzFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS").withZone(ZoneId.systemDefault());
 
     // ===========================================================================
 
@@ -61,17 +64,22 @@ public class BeanFormGenerator {
 
     //=============================================================================================
 
-    public static void enumUpdater(BeanFormItemInfo info, String value) {
+    public static void enumUpdater(BeanFormItemInfo info, Map<String, String> values) {
         try {
             // We can't access the Enum static function valueOf without 'opens' settings on the JVM
             // So need to do it the hard way....
 
-            Object[] constants = info.pdesc.getPropertyType().getEnumConstants();
+            String value = values.get(info.tag);
+            Object enumVal = null;
 
-            Object enumVal = Arrays.stream(constants)
-                    .filter(p -> p.toString().equals(value))
-                    .findFirst()
-                    .get();
+            if (StringUtils.isNotBlank(value)) {
+                Object[] constants = info.pdesc.getPropertyType().getEnumConstants();
+
+                enumVal = Arrays.stream(constants)
+                        .filter(p -> p.toString().equals(value))
+                        .findFirst()
+                        .get();
+            }
 
             BeanUtils.setProperty(info.bean, info.pdesc.getName(), enumVal);
 
@@ -99,6 +107,64 @@ public class BeanFormGenerator {
         html.append("</select>");
 
         info.updater = BeanFormGenerator::enumUpdater;
+    }
+
+
+    //=============================================================================================
+
+    public static void temporalUpdater(BeanFormItemInfo info, Map<String, String> values) {
+        try {
+            // We can't access the Enum static function valueOf without 'opens' settings on the JVM
+            // So need to do it the hard way....
+
+            String value = values.get(info.tag);
+            Object timeVal = null;
+            DateTimeFormatter formatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+
+            if (StringUtils.isNotBlank(value)) {
+                LocalDateTime localDateTime = LocalDateTime.parse(value, formatter);
+                var time = formatter.parse(value);
+                Class<?> objectClass = info.pdesc.getPropertyType();
+                timeVal = localDateTime.atZone(ZoneId.systemDefault()).toInstant();
+
+                if (objectClass.isAssignableFrom(Date.class)) {
+                    timeVal = Date.from((Instant) timeVal);
+                }
+            }
+
+            BeanUtils.setProperty(info.bean, info.pdesc.getName(), timeVal);
+
+        } catch (Exception e) {
+            // Ignoring bad values.
+        }
+    }
+
+    //=============================================================================================
+
+    private static void htmlTemporalEditor(BeanFormItemInfo info, StringBuilder html, Object value) {
+        html.append("<input type=\"datetime-local\" name=\"").append(info.tag).append("\"");
+        html.append(" id=\"").append(info.pdesc.getDisplayName()).append("\"");
+
+        if (value != null) {
+            Class<?> objectClass = info.pdesc.getPropertyType();
+            String stringValue = null;
+
+            if (objectClass.isAssignableFrom(Date.class)) {
+                stringValue = standardFormatter.format(((Date) value).toInstant());
+
+            } else if (objectClass.isAssignableFrom(Instant.class)) {
+                stringValue = standardFormatter.format((Instant)value);
+            } else {
+                stringValue = noTzFormatter.format((TemporalAccessor) value);
+            }
+
+
+            html.append(" value=\"").append(StringEscapeUtils.escapeHtml4(stringValue)).append("\"");
+        }
+
+        html.append("/>\n");
+
+        info.updater = BeanFormGenerator::temporalUpdater;
     }
 
     // ===========================================================================
@@ -218,9 +284,8 @@ public class BeanFormGenerator {
 //				editorComponent = collectionEditorComponent(value, itemsClazz, multipleOptionAnnotation, restricted);
 
             } else if (Temporal.class.isAssignableFrom(pdesc.getPropertyType())) {
-                html.append("Type not implemented");
-
-//				editorComponent = GuiUtils.getDatePicker(beanBeingEdited, pdesc.getName());
+                Object value = pdesc.getReadMethod().invoke(beanBeingEdited);
+                htmlTemporalEditor(formItemInfo, html, value);
 
             } else if (Map.class.isAssignableFrom(pdesc.getPropertyType())) {
                 html.append("Type not implemented");
