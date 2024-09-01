@@ -1,6 +1,9 @@
 package com.kirayim.jark.beans;
 
+import org.apache.commons.beanutils.BeanUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.commons.text.StringEscapeUtils;
 
 import java.beans.BeanInfo;
@@ -31,8 +34,10 @@ public class BeanFormGenerator {
     //=============================================================================================
 
     private static void htmlCheckbox(Object beanBeingEdited, PropertyDescriptor pdesc, StringBuilder html, String tag) throws Exception {
-        html.append("<input type=\"checkbox\" checked=");
-        html.append(pdesc.getReadMethod().invoke(beanBeingEdited));
+        html.append("<input type=\"checkbox\"");
+        if (((Boolean)pdesc.getReadMethod().invoke(beanBeingEdited)) == true) {
+            html.append(" checked");
+        }
         html.append(" name=\"").append(tag).append("\"");
         html.append(" id=\"").append(pdesc.getDisplayName()).append("\"");
         html.append("/>");
@@ -56,12 +61,33 @@ public class BeanFormGenerator {
 
     //=============================================================================================
 
-    private static void htmlEnumEditor(PropertyDescriptor pdesc, StringBuilder html, String tag, Object value) {
-        html.append("<select name=\"").append(tag).append("\"");
-        html.append(" id=\"").append(pdesc.getDisplayName()).append("\"");
+    public static void enumUpdater(BeanFormItemInfo info, String value) {
+        try {
+            // We can't access the Enum static function valueOf without 'opens' settings on the JVM
+            // So need to do it the hard way....
+
+            Object[] constants = info.pdesc.getPropertyType().getEnumConstants();
+
+            Object enumVal = Arrays.stream(constants)
+                    .filter(p -> p.toString().equals(value))
+                    .findFirst()
+                    .get();
+
+            BeanUtils.setProperty(info.bean, info.pdesc.getName(), enumVal);
+
+        } catch (Exception e) {
+            // Ignoring bad values.
+        }
+    }
+
+    //=============================================================================================
+
+    private static void htmlEnumEditor(BeanFormItemInfo info, StringBuilder html, Object value) {
+        html.append("<select name=\"").append(info.tag).append("\"");
+        html.append(" id=\"").append(info.pdesc.getDisplayName()).append("\"");
         html.append(">\n");
 
-        for (Object item : pdesc.getPropertyType().getEnumConstants()) {
+        for (Object item : info.pdesc.getPropertyType().getEnumConstants()) {
             html.append("<option value=\"").append(item).append("\"");
             if (item == value) {
                 html.append(" selected=\"true\"");
@@ -71,6 +97,8 @@ public class BeanFormGenerator {
             html.append("</option>");
         }
         html.append("</select>");
+
+        info.updater = BeanFormGenerator::enumUpdater;
     }
 
     // ===========================================================================
@@ -157,7 +185,7 @@ public class BeanFormGenerator {
             } else if (Enum.class.isAssignableFrom(pdesc.getPropertyType()) || pdesc.getPropertyType().isEnum()) {
                 Object value = pdesc.getReadMethod().invoke(beanBeingEdited);
 
-                htmlEnumEditor(pdesc, html, tag, value);
+                htmlEnumEditor(formItemInfo, html, value);
 
             } else if (pdesc.getPropertyType().isArray()) {
                    // TODO:

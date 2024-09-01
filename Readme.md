@@ -65,16 +65,20 @@ by simply
   var editor = new BeanEditor(myObject);
 ```
 
+This will create and set up a Jark instance, and serve a default web page with
+the edit form embedded.
+
 When the user submits the form, the fields of the bean are automatically updated with
 the new values.
 
 However, constructors are available with which you can supply a function to be called when
-the bean is updated, and your own web page, with a tag to be replaced by the bean 
+the bean is updated, and your own web page and Jark instance, with a tag to be replaced by the bean 
 editing HTML, this would usually be in a form, because then the browser collects all
 the data easily.
 
 It works by generating the content of a form, giving each item an ID which is a dotted
 path through the membership tree.
+
 
 On form submission, the values are updated in the bean.
 

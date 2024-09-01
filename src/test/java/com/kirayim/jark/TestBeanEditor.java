@@ -12,6 +12,7 @@ import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.remote.DesiredCapabilities;
 import org.openqa.selenium.remote.RemoteWebDriver;
+import org.openqa.selenium.support.ui.Select;
 
 import java.net.HttpURLConnection;
 import java.net.URI;
@@ -59,7 +60,34 @@ public class TestBeanEditor {
         element.clear();
         element.sendKeys("1234");
 
+        new Select(driver.findElement(By.id("testType"))).selectByVisibleText("SMILEY");
+
+        driver.findElement(By.id("valid")).click();
+
         driver.findElement(By.name("beanform")).submit();
         Assert.assertEquals(1234, beanUnderTest.getDerivedItem());
+        Assert.assertEquals(TestSubClass.TestTypes.SMILEY, beanUnderTest.getSub().getTestType());
+        Assert.assertEquals(true, beanUnderTest.isValid());
+    }
+
+    //=============================================================================================
+
+    /**
+     * If you want to run the web page
+     * @param args
+     * @throws Exception
+     */
+    public static void main(String[] args) throws Exception {
+        var beanUnderTest = new DerivedTestClass();
+
+        var beanEditor = new BeanEditor(beanUnderTest, p -> {
+            synchronized(beanUnderTest) {
+                beanUnderTest.notify();
+            }
+        });
+
+        synchronized (beanUnderTest) {
+            beanUnderTest.wait();
+        }
     }
 }

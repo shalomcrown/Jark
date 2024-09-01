@@ -88,7 +88,6 @@ public class BeanEditor<T> implements Closeable {
     public String mainPage(Request request, Response response) throws Exception {
         InputStream inputStream;
 
-
         if (StringUtils.isBlank(basePage)) {
             inputStream = new ByteArrayInputStream(defaultPage.getBytes());
         } else {
@@ -132,11 +131,16 @@ public class BeanEditor<T> implements Closeable {
                         if (info != null) {
                             if (info.updater == null) {
                                 BeanUtils.setProperty(info.bean, info.pdesc.getName(), parts[1]);
+                            } else {
+                                info.updater.accept(info, parts[1]);
                             }
                         } else {
                             // TODO:
                         }
 
+                    } else if (parts.length == 1) {
+                        BeanFormItemInfo info = formGenerator.elementMap.get(parts[0]);
+                        BeanUtils.setProperty(info.bean, info.pdesc.getName(), null);
                     }
                 }
             }
@@ -146,7 +150,7 @@ public class BeanEditor<T> implements Closeable {
             onUpdate.accept(bean);
         }
 
-        return null;
+        return mainPage(request, response);
     }
 
     //=============================================================================================
