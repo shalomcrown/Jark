@@ -9,6 +9,8 @@ public class BeanFormItemInfo {
     PropertyDescriptor pdesc;
     Object bean;
     BiConsumer<BeanFormItemInfo, Map<String, String>> updater;
+    Class<?> clazz;
+    String displayName;
 
     public BeanFormItemInfo(String tag, PropertyDescriptor pdesc, Object bean, BiConsumer<BeanFormItemInfo, Map<String, String>> updater) {
         this.tag = tag;

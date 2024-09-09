@@ -9,7 +9,6 @@ import java.beans.Introspector;
 import java.beans.PropertyDescriptor;
 import java.io.File;
 import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -24,7 +23,7 @@ public class BeanFormGenerator {
 
     Map<String, BeanFormItemInfo> elementMap = new HashMap<>();
 
-    public final static DateTimeFormatter standardFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSZ").withZone(ZoneId.systemDefault());
+    public final static DateTimeFormatter standardFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS").withZone(ZoneId.systemDefault());
     public final static DateTimeFormatter noTzFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS").withZone(ZoneId.systemDefault());
 
     // ===========================================================================
@@ -48,9 +47,9 @@ public class BeanFormGenerator {
 
     //=============================================================================================
 
-    private static void htmlValueEdit(Object beanBeingEdited, PropertyDescriptor pdesc, StringBuilder html, String tag) throws IllegalAccessException, InvocationTargetException {
+    private static void htmlValueEdit(Object beanBeingEdited, String propertyName, StringBuilder html, String tag) throws Exception {
         html.append("<input type=\"text\"");
-        Object value = pdesc.getReadMethod().invoke(beanBeingEdited);
+        Object value = BeanUtils.getProperty(beanBeingEdited, propertyName);
 
         if (value != null) {
             html.append(" value=");
@@ -58,7 +57,7 @@ public class BeanFormGenerator {
         }
 
         html.append(" name=\"").append(tag).append("\"");
-        html.append(" id=\"").append(pdesc.getDisplayName()).append("\"");
+        html.append(" id=\"").append(propertyName).append("\"");
         html.append("/>");
     }
 
@@ -108,7 +107,6 @@ public class BeanFormGenerator {
 
         info.updater = BeanFormGenerator::enumUpdater;
     }
-
 
     //=============================================================================================
 
@@ -167,98 +165,101 @@ public class BeanFormGenerator {
         info.updater = BeanFormGenerator::temporalUpdater;
     }
 
+    // =================================================================================
+
+    private static void htmlCollectionEditor(Object beanBeingEdited, String parent, PropertyDescriptor pdesc, StringBuilder html) throws Exception {
+        Object obj = pdesc.getReadMethod().invoke(beanBeingEdited);
+
+
+    }
+
+    // =================================================================================
+
+    private void htmlArrayEditor(Object beanBeingEdited, String parent, PropertyDescriptor pdesc, StringBuilder html) throws Exception {
+        Collection obj = (Collection)pdesc.getReadMethod().invoke(beanBeingEdited);
+
+        int index = 0;
+        html.append("<table>");
+
+        for (Object item : obj) {
+            String tag = String.format("%s[%d]", parent, index);
+
+            html.append("<tr><td>");
+            html.append("<input type=\"radio\" id=\"").append(tag).append("_select\"");
+            html.append(" name=\"").append(index).append("\"/>");
+            html.append("</td><td>");
+            generateBeanHtml(item, tag);
+            html.append("</td></tr>");
+
+            index++;
+        }
+
+
+        html.append("</table>");
+
+    }
+
+
     // ===========================================================================
 
     public String generateBeanHtml(Object beanBeingEdited) throws Exception{
         return generateBeanHtml(beanBeingEdited, null);
     }
 
-    //=============================================================================================
 
-    public String generateBeanHtml(Object beanBeingEdited, String parent) throws Exception {
-        StringBuilder html = new StringBuilder();
+    // =================================================================================
 
-        if (beanBeingEdited.getClass().isArray() || Collection.class.isAssignableFrom(beanBeingEdited.getClass())) {
-                // todo
-//			return collectionEditorComponent(beanBeingEdited, arrayItemClazz, null, parentRestricted);
-                return null;
-        }
+    private void getHtmlForElement(Object beanBeingEdited, String parent, PropertyDescriptor pdesc, StringBuilder html) throws Exception {
+        html.append("<tr><td>");
+        html.append(getFormattedStringForName(pdesc.getName()));
+        html.append("</td><td>");
 
-        if (parent == null) {
-                parent = "";
-        } else {
-                parent = parent + ".";
-        }
+        String tag = parent + pdesc.getName();
+        Field field = JarkBeanUtils.getField(beanBeingEdited, pdesc.getName());
 
-        BeanInfo info = Introspector.getBeanInfo(beanBeingEdited.getClass());
+        BeanFormItemInfo formItemInfo = new BeanFormItemInfo(tag, pdesc, beanBeingEdited);
 
-        PropertyDescriptor[] props = info.getPropertyDescriptors();
-        Arrays.sort(props, (p, q) -> p.getName().compareTo(q.getName()));
-
-        html.append("<table>\n");
-
-        for (PropertyDescriptor pdesc : props) {
-
-            if (pdesc.getReadMethod() == null || pdesc.getWriteMethod() == null || pdesc.isHidden()) {
-                continue;
-            }
-
-//            if (BeanUtilities.isAnnotationPresent(beanBeingEdited, pdesc.getName(), ModelAnnotations.HiddenFromSettingsDialog.class)) {
-//                    continue;
-//            }
-//
-//            if (extraInfo != null && ArrayUtils.contains(extraInfo.getHiddenFields(),  pdesc.getName())) {
-//                    continue;
-//            }
-
-            if (pdesc.getDisplayName().equals("type") || pdesc.getDisplayName().equals("class")) {
-                    continue;
-            }
+        elementMap.put(tag, formItemInfo);
 
 
-            html.append("<tr><td>");
-            html.append(getFormattedStringForName(pdesc.getName()));
-            html.append("</td><td>");
+        if (beanBeingEdited.getClass().isArray()) {
+            htmlArrayEditor(beanBeingEdited, tag, pdesc, html);
 
-            String tag = parent + pdesc.getName();
-            Field field = JarkBeanUtils.getField(beanBeingEdited, pdesc.getName());
+        } else if (Collection.class.isAssignableFrom(beanBeingEdited.getClass())) {
+            htmlCollectionEditor(beanBeingEdited, tag, pdesc, html);
 
-            BeanFormItemInfo formItemInfo = new BeanFormItemInfo(tag, pdesc, beanBeingEdited);
+        } else  if (Boolean.class.isAssignableFrom(pdesc.getPropertyType())
+                || pdesc.getPropertyType().equals(boolean.class)
+                || pdesc.getPropertyType().equals(Boolean.class)) {
 
-            elementMap.put(tag, formItemInfo);
-
-            if (Boolean.class.isAssignableFrom(pdesc.getPropertyType())
-                            || pdesc.getPropertyType().equals(boolean.class)
-                            || pdesc.getPropertyType().equals(Boolean.class)) {
-
-                htmlCheckbox(beanBeingEdited, pdesc, html, tag);
+            htmlCheckbox(beanBeingEdited, pdesc, html, tag);
 
 
-            } else if (File.class.isAssignableFrom(pdesc.getPropertyType())
-                            || field.isAnnotationPresent(ModelAnnotations.FileName.class)
-                            || field.isAnnotationPresent(ModelAnnotations.FolderName.class)) {
-                htmlValueEdit(beanBeingEdited, pdesc, html, tag);
+        } else if (File.class.isAssignableFrom(pdesc.getPropertyType())
+                || field.isAnnotationPresent(ModelAnnotations.FileName.class)
+                || field.isAnnotationPresent(ModelAnnotations.FolderName.class)) {
+            htmlValueEdit(beanBeingEdited, pdesc.getName(), html, tag);
 
-                    // TODO
+            // TODO
 //				editorComponent = GuiUtils.getFileItemPanel(beanBeingEdited, pdesc.getName());
 
-            } else if (pdesc.getPropertyType().isPrimitive()
-                            || pdesc.getPropertyType().isAssignableFrom(String.class)
-                            || Number.class.isAssignableFrom(pdesc.getPropertyType())) {
+        } else if (pdesc.getPropertyType().isPrimitive()
+                || pdesc.getPropertyType().isAssignableFrom(String.class)
+                || Number.class.isAssignableFrom(pdesc.getPropertyType())) {
 
-                htmlValueEdit(beanBeingEdited, pdesc, html, tag);
+            htmlValueEdit(beanBeingEdited, pdesc.getName(), html, tag);
 
-            } else if (Enum.class.isAssignableFrom(pdesc.getPropertyType()) || pdesc.getPropertyType().isEnum()) {
-                Object value = pdesc.getReadMethod().invoke(beanBeingEdited);
+        } else if (Enum.class.isAssignableFrom(pdesc.getPropertyType()) || pdesc.getPropertyType().isEnum()) {
+            Object value = pdesc.getReadMethod().invoke(beanBeingEdited);
 
-                htmlEnumEditor(formItemInfo, html, value);
+            htmlEnumEditor(formItemInfo, html, value);
 
-            } else if (pdesc.getPropertyType().isArray()) {
-                   // TODO:
-                html.append("Type not implemented");
+        } else if (pdesc.getPropertyType().isArray()) {
+            // TODO:
+            html.append("Type not implemented");
 
-            } else if (Collection.class.isAssignableFrom(pdesc.getPropertyType())) {
-                html.append("Type not implemented");
+        } else if (Collection.class.isAssignableFrom(pdesc.getPropertyType())) {
+            html.append("Type not implemented");
 
 //				Method method = pdesc.getReadMethod();
 //				method.setAccessible(true);
@@ -283,12 +284,12 @@ public class BeanFormGenerator {
 //
 //				editorComponent = collectionEditorComponent(value, itemsClazz, multipleOptionAnnotation, restricted);
 
-            } else if (Temporal.class.isAssignableFrom(pdesc.getPropertyType())) {
-                Object value = pdesc.getReadMethod().invoke(beanBeingEdited);
-                htmlTemporalEditor(formItemInfo, html, value);
+        } else if (Temporal.class.isAssignableFrom(pdesc.getPropertyType())) {
+            Object value = pdesc.getReadMethod().invoke(beanBeingEdited);
+            htmlTemporalEditor(formItemInfo, html, value);
 
-            } else if (Map.class.isAssignableFrom(pdesc.getPropertyType())) {
-                html.append("Type not implemented");
+        } else if (Map.class.isAssignableFrom(pdesc.getPropertyType())) {
+            html.append("Type not implemented");
 
 //				Method method = pdesc.getReadMethod();
 //				method.setAccessible(true);
@@ -323,26 +324,26 @@ public class BeanFormGenerator {
 //			} else if (Quantity.class.isAssignableFrom(pdesc.getPropertyType())) {
 //				editorComponent = GuiUtils.getQuantityEditor(beanBeingEdited, pdesc.getName());
 
-            } else {
-                Object value = null;
-                try {
-                        Method method = pdesc.getReadMethod();
-                        method.setAccessible(true);
-                        value = method.invoke(beanBeingEdited, (Object[]) null);
+        } else {
+            Object value = null;
+            try {
+                Method method = pdesc.getReadMethod();
+                method.setAccessible(true);
+                value = method.invoke(beanBeingEdited, (Object[]) null);
 
-                        if (value != null) {
-                                html.append(generateBeanHtml(value, tag));
+                if (value != null) {
+                    html.append(generateBeanHtml(value, tag));
 
 //						if (restricted != null) {
 //							editorComponent.setBackground(RESTRICTED_COLOR);
 //							editorComponent.setForeground(Color.WHITE);
 //						}
-                        } else {
-                                html.append("<p>Empty value</p>");
-                        }
-                } catch (Exception e) {
-                        html.append("<p>Couldn't get value</p>");
+                } else {
+                    html.append("<p>Empty value</p>");
                 }
+            } catch (Exception e) {
+                html.append("<p>Couldn't get value</p>");
+            }
 
 //				if (value == null && BeanUtilities.isAnnotationPresent(beanBeingEdited, pdesc.getName(),
 //						NewClassForSettingsDialog.class)) {
@@ -387,9 +388,49 @@ public class BeanFormGenerator {
 //
 //					newButton.addActionListener(new NewButtonAction(pdesc.getWriteMethod(), beanBeingEdited, clazz,
 //							this, replaceComponent, annotation, restricted, authFactory));
+        }
+
+        html.append("</td></tr>\n");
+    }
+
+
+    //=============================================================================================
+
+    public String generateBeanHtml(Object beanBeingEdited, String parent) throws Exception {
+        StringBuilder html = new StringBuilder();
+
+        if (parent == null) {
+                parent = "";
+        } else {
+                parent = parent + ".";
+        }
+
+        BeanInfo info = Introspector.getBeanInfo(beanBeingEdited.getClass());
+
+        PropertyDescriptor[] props = info.getPropertyDescriptors();
+        Arrays.sort(props, (p, q) -> p.getName().compareTo(q.getName()));
+
+        html.append("<table>\n");
+
+        for (PropertyDescriptor pdesc : props) {
+
+            if (pdesc.getReadMethod() == null || pdesc.getWriteMethod() == null || pdesc.isHidden()) {
+                continue;
             }
 
-            html.append("</td></tr>\n");
+            if (JarkBeanUtils.isAnnotationPresent(beanBeingEdited, pdesc.getName(), ModelAnnotations.HiddenFromSettingsDialog.class)) {
+                    continue;
+            }
+//
+//            if (extraInfo != null && ArrayUtils.contains(extraInfo.getHiddenFields(),  pdesc.getName())) {
+//                    continue;
+//            }
+
+            if (pdesc.getDisplayName().equals("type") || pdesc.getDisplayName().equals("class")) {
+                    continue;
+            }
+
+            getHtmlForElement(beanBeingEdited, parent, pdesc, html);
         }
 
 
@@ -416,4 +457,5 @@ public class BeanFormGenerator {
 
         return html.toString();
     }
+
 }
