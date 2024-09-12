@@ -15,10 +15,6 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
-/**
- * Hello world!
- *
- */
 public class Jark implements Closeable, HttpHandler {
 
     protected static final String DEFAULT_ACCEPT_TYPE = "*/*";
