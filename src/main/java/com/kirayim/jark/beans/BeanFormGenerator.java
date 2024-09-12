@@ -227,7 +227,6 @@ public class BeanFormGenerator {
         return generateBeanHtml(beanBeingEdited, null);
     }
 
-
     // =================================================================================
 
     private void getHtmlForElement(Object beanBeingEdited, String parent, PropertyDescriptor pdesc, StringBuilder html) throws Exception {
@@ -241,7 +240,6 @@ public class BeanFormGenerator {
         BeanFormItemInfo formItemInfo = new BeanFormItemInfo(tag, pdesc, beanBeingEdited);
 
         elementMap.put(tag, formItemInfo);
-
 
         if (beanBeingEdited.getClass().isArray()) {
             htmlArrayEditor(beanBeingEdited, tag, pdesc, html);
@@ -257,8 +255,9 @@ public class BeanFormGenerator {
 
 
         } else if (File.class.isAssignableFrom(pdesc.getPropertyType())
-                || field.isAnnotationPresent(ModelAnnotations.FileName.class)
-                || field.isAnnotationPresent(ModelAnnotations.FolderName.class)) {
+                || (field != null
+                    && (field.isAnnotationPresent(ModelAnnotations.FileName.class)
+                        || field.isAnnotationPresent(ModelAnnotations.FolderName.class)))) {
             htmlValueEdit(beanBeingEdited, pdesc.getName(), html, tag);
 
             // TODO
