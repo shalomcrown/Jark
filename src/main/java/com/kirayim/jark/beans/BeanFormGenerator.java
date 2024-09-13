@@ -43,6 +43,7 @@ public class BeanFormGenerator {
 
 
     Map<String, BeanFormItemInfo> elementMap = new HashMap<>();
+    Map<Class<?>, IBeanConverter> converters = new HashMap<>();
 
     public final static DateTimeFormatter standardFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS").withZone(ZoneId.systemDefault());
     public final static DateTimeFormatter noTzFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS").withZone(ZoneId.systemDefault());
@@ -63,7 +64,7 @@ public class BeanFormGenerator {
         }
         html.append(" name=\"").append(tag).append("\"");
         html.append(" id=\"").append(pdesc.getDisplayName()).append("\"");
-        html.append("/>");
+        html.append("/>\n");
     }
 
     //=============================================================================================
@@ -73,13 +74,18 @@ public class BeanFormGenerator {
         Object value = BeanUtils.getProperty(beanBeingEdited, propertyName);
 
         if (value != null) {
-            html.append(" value=");
-            html.append(StringEscapeUtils.escapeHtml4(Objects.toString(value)));
+            String stringValue = Objects.toString(value);
+
+            if (StringUtils.isNotBlank(stringValue)) {
+                html.append(" value=\"");
+                html.append(StringEscapeUtils.escapeHtml4(stringValue));
+                html.append("\"");
+            }
         }
 
         html.append(" name=\"").append(tag).append("\"");
         html.append(" id=\"").append(propertyName).append("\"");
-        html.append("/>");
+        html.append("/>\n");
     }
 
     //=============================================================================================
@@ -124,7 +130,7 @@ public class BeanFormGenerator {
             html.append(item.toString());
             html.append("</option>");
         }
-        html.append("</select>");
+        html.append("</select>\n");
 
         info.updater = BeanFormGenerator::enumUpdater;
     }
@@ -216,7 +222,7 @@ public class BeanFormGenerator {
         }
 
 
-        html.append("</table>");
+        html.append("</table>\n");
 
     }
 
@@ -241,7 +247,21 @@ public class BeanFormGenerator {
 
         elementMap.put(tag, formItemInfo);
 
-        if (beanBeingEdited.getClass().isArray()) {
+        var converterClazz = converters
+                .keySet()
+                .stream()
+                .filter(p -> p.isAssignableFrom(pdesc.getPropertyType()))
+                .findFirst()
+                .orElse(null);
+
+
+        if (converterClazz != null) {
+            Object value = pdesc.getReadMethod().invoke(beanBeingEdited);
+            var converter = converters.get(converterClazz);
+            formItemInfo.updater = converter::deserialize;
+            converter.serialize(formItemInfo, html, value);
+
+        } else if (beanBeingEdited.getClass().isArray()) {
             htmlArrayEditor(beanBeingEdited, tag, pdesc, html);
 
         } else if (Collection.class.isAssignableFrom(beanBeingEdited.getClass())) {
@@ -346,6 +366,7 @@ public class BeanFormGenerator {
         } else {
             Object value = null;
             try {
+
                 Method method = pdesc.getReadMethod();
                 method.setAccessible(true);
                 value = method.invoke(beanBeingEdited, (Object[]) null);
