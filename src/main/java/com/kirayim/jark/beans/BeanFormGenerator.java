@@ -253,7 +253,6 @@ public class BeanFormGenerator {
 
             htmlCheckbox(beanBeingEdited, pdesc, html, tag);
 
-
         } else if (File.class.isAssignableFrom(pdesc.getPropertyType())
                 || (field != null
                     && (field.isAnnotationPresent(ModelAnnotations.FileName.class)

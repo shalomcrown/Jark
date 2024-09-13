@@ -22,6 +22,7 @@
 package com.kirayim.jark;
 
 import com.sun.net.httpserver.*;
+import org.apache.commons.lang3.StringUtils;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
@@ -91,6 +92,10 @@ public class Jark implements Closeable, HttpHandler {
                 return new FileInputStream(tryFileName);
             }
         } else {
+            if (fileName.endsWith("/")) {
+                fileName = fileName.substring(0, fileName.lastIndexOf("/"));
+            }
+
             File tryFileName = new File(fileName);
 
             if (tryFileName.exists() == false && fileName.startsWith("/")) {
@@ -123,6 +128,22 @@ public class Jark implements Closeable, HttpHandler {
         return resourceStream;
     }
 
+    // =================================================================================
+
+    void loadResource(HttpExchange exchange, String stringTarget) throws Exception {
+
+        try (var in = loadResourceAsStream(stringTarget)) {
+            if (in != null) {
+                byte[] inputData = in.readAllBytes(); // Sorry - need to read it all in so we know how long it is
+                exchange.sendResponseHeaders(200, inputData.length);
+                var out = exchange.getResponseBody();
+                out.write(inputData);
+                out.close();
+                exchange.close();
+            }
+        }
+    }
+
     // ===========================================================================
 
     public void handleStaticContent(JarkStaticContent target, HttpExchange exchange, Request request, Response response) throws Exception {
@@ -130,14 +151,19 @@ public class Jark implements Closeable, HttpHandler {
 
             String path = request.getPath();
 
-            if (path.startsWith(target.getPath())) {
-                path = path.substring(target.getPath().length());
-
-            } else if (target.getPath().startsWith("/")) {
+//            if (path.startsWith(target.getPath())) {
+//                path = path.substring(target.getPath().length());
+//
+//            } else
+            if (target.getPath().startsWith("/")) {
                 String targetNoSlash = target.getPath().substring(1);
                 if (path.startsWith(targetNoSlash)) {
                     path = path.substring((targetNoSlash.length()));
                 }
+            }
+
+            if (StringUtils.isBlank(path)) {
+                path = "index.html";
             }
 
             if (stringTarget.endsWith("/")) {
@@ -154,16 +180,8 @@ public class Jark implements Closeable, HttpHandler {
                 }
             }
 
-            try (var in = loadResourceAsStream(stringTarget)) {
-                if (in != null) {
-                    byte[] inputData = in.readAllBytes(); // Sorry - need to read it all in so we know how long it is
-                    exchange.sendResponseHeaders(200, inputData.length);
-                    var out = exchange.getResponseBody();
-                    out.write(inputData);
-                    out.close();
-                    exchange.close();
-                }
-            }
+
+            loadResource(exchange, stringTarget);
         }
     }
 
@@ -439,6 +457,12 @@ public class Jark implements Closeable, HttpHandler {
                     handleException(request.exchange, e);
                     return;
                 }
+            }
+
+            if (binaryResults.isEmpty()
+                    && exchange.getResponseCode() == -1
+                    && results.isEmpty()) {
+                loadResource(exchange, request.getPath());
             }
 
             if (executeFilters(request, response, afterFilters) == false) {
