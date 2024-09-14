@@ -82,8 +82,95 @@ path through the membership tree.
 
 On form submission, the values are updated in the bean.
 
-Arrays, collections, Temporals etc. are not yet imeplemented, and we'll need a way
-of specifying custom serializers for things like _javax.quantity_.
+Arrays, collections.
+For classes such as <i>javax.quantity.Quantity</i> that require custom
+serializers, you can write your own by implementing `IBeanConverter` and 
+registering with the BeanEditor using `addConverter`.
+
+The serializer is passed information on the field and the tag. It can output
+whatever HTML is needed to the string builder
+
+The deserializer is passed the information, and a map of all the data
+returned in the HTML form submission, so the fucntion can use any other 
+tags it requires.
+
+```aiignore
+
+public class QuantityJarkSerializer implements IBeanConverter {
+
+    /**
+     * The given tag is used on the value and a tag with ".unit" appended
+     * is used for the unit.
+     * @param info
+     * @param html
+     * @param value
+     */
+    @Override
+    public void serialize(BeanFormItemInfo info, StringBuilder html, Object value) {
+        Quantity<?> quantity = (Quantity<?>) value;
+
+        if (value == null) {
+            return;
+        }
+
+        html.append("<table><tr><th>Value</th><th>Unit</th></tr>\n");
+        html.append("<tr><td>");
+
+        html.append("<input type=\"text\"");
+        Number qValue = quantity.getValue();
+
+        String stringValue = Objects.toString(qValue);
+
+        if (StringUtils.isNotBlank(stringValue)) {
+            html.append(" value=\"");
+            html.append(StringEscapeUtils.escapeHtml4(stringValue));
+            html.append("\"");
+        }
+
+        html.append(" name=\"").append(info.getTag()).append("\"");
+        html.append(" id=\"").append(info.getPdesc().getName()).append("\"");
+        html.append("/></td><td>\n");
+
+        Unit<?> unit = quantity.getUnit();
+
+        html.append("<input type=\"text\"");
+        String unitValue = unit.toString();
+
+        if (StringUtils.isNotBlank(stringValue)) {
+            html.append(" value=\"");
+            html.append(StringEscapeUtils.escapeHtml4(unitValue));
+            html.append("\"");
+        }
+
+        html.append(" name=\"").append(info.getTag() + ".unit").append("\"");
+        html.append(" id=\"").append(info.getPdesc().getName()).append("\"");
+        html.append("/></td></tr>\n");
+        html.append("</table>\n");
+    }
+
+    // =================================================================================
+
+    @Override
+    public void deserialize(BeanFormItemInfo info, Map<String, String> bodyMap) {
+        try {
+            String value = bodyMap.get(info.getTag());
+            String unitValue = bodyMap.get(info.getTag() + ".unit");
+
+            if (value == null || unitValue == null) {
+                return;
+            }
+
+            Unit<?> newUnit = SimpleUnitFormat.getInstance().parse(unitValue);
+            Number numberValue = NumberFormat.getInstance().parse(value);
+            Quantity<?> newQantity =  Quantities.getQuantity(numberValue, newUnit);
+
+            BeanUtils.setProperty(info.getBean(), info.getPdesc().getName(), newQantity);
+        } catch (Exception e) {
+            .... something ...
+        }
+    }
+```
+
 
 
 # Implementation status

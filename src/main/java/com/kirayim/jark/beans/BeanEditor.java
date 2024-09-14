@@ -182,6 +182,12 @@ public class BeanEditor<T> implements Closeable {
         return mainPage(request, response);
     }
 
+    // =================================================================================
+
+    public void addConverter(Class<?> clazz, IBeanConverter converter) {
+        formGenerator.converters.put(clazz, converter);
+    }
+
     //=============================================================================================
 
     @Override
