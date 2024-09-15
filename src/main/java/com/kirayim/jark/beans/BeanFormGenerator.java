@@ -263,13 +263,17 @@ public class BeanFormGenerator {
         }
 
         html.append("</table>\n");
-
     }
 
     // =================================================================================
 
     private void htmlArrayEditor(Object beanBeingEdited, String parent, PropertyDescriptor pdesc, StringBuilder html) throws Exception {
-        Collection obj = (Collection)pdesc.getReadMethod().invoke(beanBeingEdited);
+        if (pdesc.getPropertyType().getComponentType().isPrimitive()) {
+            html.append("TODO: Primitive array not yet implemented");
+            return;
+        }
+
+        Object[] obj = (Object[])pdesc.getReadMethod().invoke(beanBeingEdited);
 
         int index = 0;
         html.append("<table>");
