@@ -31,6 +31,7 @@ import java.io.ByteArrayInputStream;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URLDecoder;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -153,7 +154,7 @@ public class BeanEditor<T> implements Closeable {
                     String[] parts = item.split("=");
 
                     if (parts.length >= 2) {
-                        bodyMap.put(parts[0], parts[1]);
+                        bodyMap.put(parts[0], URLDecoder.decode(parts[1]));
                     } else {
                         bodyMap.put(parts[0], null);
                     }
